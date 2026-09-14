@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#122620" />
+    <meta name="description" content="A touch-first family dashboard for chores, rewards, schedules, timers, and family moments." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HouseHelper" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="apple-touch-icon" href="./favicon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>HouseHelper</title>
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9Z"/></symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4.3 4.3L19 6.7"/></symbol>
+      <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+      <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></symbol>
+      <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.2a1.8 1.8 0 0 0 1.2-3.2 1.8 1.8 0 0 1 1.2-3.2H18A3 3 0 0 0 21 12a9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="15" cy="8" r="1"/></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    </svg>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#home" data-view="home" aria-label="HouseHelper home">
+          <span class="brand-mark"><svg><use href="#icon-home"></use></svg></span>
+          <span>House<span>Helper</span></span>
+        </a>
+        <div class="topbar-actions">
+          <div class="connection-pill" aria-label="Connection status"><span></span> This device</div>
+          <button class="icon-button" id="sleepButton" type="button" aria-label="Enter calm mode">
+            <svg><use href="#icon-moon"></use></svg>
+          </button>
+          <button class="profile-switch" id="profileSwitch" type="button" aria-label="Switch dashboard profile">
+            <span class="avatar">⌂</span>
+            <span class="profile-copy"><strong>Family</strong><small>Family view</small></span>
+            <span class="chevron">⌄</span>
+          </button>
+        </div>
+      </header>
+
+      <aside class="side-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="home" type="button"><svg><use href="#icon-home"></use></svg><span>Home</span></button>
+        <button class="nav-item" data-view="chores" type="button"><svg><use href="#icon-check"></use></svg><span>Chores</span></button>
+        <button class="nav-item" data-view="rewards" type="button"><svg><use href="#icon-star"></use></svg><span>Rewards</span></button>
+        <button class="nav-item" data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Calendar</span></button>
+        <button class="nav-item" data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art show</span></button>
+        <button class="nav-item nav-settings" data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
+      </aside>
+
+      <main id="top" tabindex="-1">
+        <div class="app-view active" id="homeView" data-app-view="home">
+        <section class="welcome-row" aria-labelledby="pageTitle">
+          <div>
+            <p class="date-line" id="todayLabel"></p>
+            <h1 id="pageTitle">Good afternoon, family</h1>
+          </div>
+          <div class="welcome-actions">
+            <button class="customize-button" id="customizeLayoutButton" type="button"><svg><use href="#icon-settings"></use></svg><span>Arrange</span></button>
+            <div class="idle-status" id="idleStatus" hidden><span></span><span>Family view in <strong id="idleCountdown">3:00</strong></span></div>
+            <div class="day-score"><span class="score-icon"><svg><use href="#icon-star"></use></svg></span><span><strong id="dayScoreValue">3 chores</strong><small id="dayScoreLabel">done today</small></span></div>
+          </div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="card reward-card" id="rewards" data-widget="rewards" aria-labelledby="rewardTitle">
+            <div class="reward-glow"></div>
+            <div class="profile-motif" aria-hidden="true">✿ ✦ ✿</div>
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Reward radar</p>
+                <h2 id="rewardTitle">Harper is closing in</h2>
+              </div>
+              <div class="reward-controls adult-only">
+                <div class="reward-kid-tabs" aria-label="Choose kid reward account">
+                  <button class="active" data-reward-owner="harper" type="button">Harper</button>
+                  <button data-reward-owner="griffin" type="button">Griffin</button>
+                </div>
+                <button class="secondary-button" id="manageRewardsButton" type="button">Manage</button>
+              </div>
+            </div>
+            <div class="reward-main">
+              <div class="progress-orbit" id="progressOrbit" style="--progress: 67%">
+                <div class="orbit-center"><strong id="pointCount">80</strong><span>of <span id="targetCount">120</span></span></div>
+              </div>
+              <div class="reward-details">
+                <div class="reward-next">
+                  <span class="reward-emoji" aria-hidden="true">🍦</span>
+                  <div><small>Next reward</small><strong id="rewardName">Ice cream trip</strong></div>
+                  <span class="points-left" id="pointsLeft">40 to go</span>
+                </div>
+                <div class="progress-track" aria-label="Reward progress"><span id="progressBar" style="width:67%"></span></div>
+                <p class="encouragement" id="encouragement"><strong>Two more chores</strong> could unlock it this week.</p>
+                <div class="milestones" aria-label="Reward milestones">
+                  <div class="milestone reached"><span>✓</span><strong>50</strong><small>Extra screen time</small></div>
+                  <div class="milestone current"><span>🍦</span><strong>120</strong><small>Ice cream trip</small></div>
+                  <div class="milestone"><span>🎬</span><strong>200</strong><small>Pick movie night</small></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card chores-card" id="chores" data-widget="chores" aria-labelledby="choresTitle">
+            <div class="card-header compact">
+              <div><p class="eyebrow" id="choreOwnerLabel">Today · Everyone</p><h2 id="choresTitle">Chores</h2></div>
+              <div class="completion-count"><strong id="choreCount">0</strong><span>/ <span id="choreTotal">0</span> done</span></div>
+            </div>
+            <div class="chore-list" id="choreList"></div>
+            <button class="full-button adult-only" id="addChoreButton" type="button">+ Add a chore</button>
+          </section>
+
+          <section class="card attention-card" data-widget="attention" aria-labelledby="attentionTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Needs attention</p><h2 id="attentionTitle">Household reminders</h2></div><span class="attention-count" id="attentionCount">2</span></div>
+            <div class="attention-list" id="homeAttentionList"></div>
+            <button class="text-button" data-view="chores" type="button">Review all chores <span>›</span></button>
+          </section>
+
+          <section class="card schedule-card" id="calendar" data-widget="calendar" aria-labelledby="scheduleTitle">
+            <div class="card-header compact">
+              <div><p class="eyebrow">Up next</p><h2 id="scheduleTitle">Family schedule</h2></div>
+              <button class="text-button" data-view="calendar" type="button">Week <span>›</span></button>
+            </div>
+            <div class="event-list" id="homeEventList"></div>
+          </section>
+
+          <section class="card timer-card" data-widget="timer" aria-labelledby="timerTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Stay on track</p><h2 id="timerTitle">Quick timer</h2></div><svg class="header-icon"><use href="#icon-clock"></use></svg></div>
+            <div class="timer-display" id="timerDisplay" aria-live="polite">15:00</div>
+            <div class="timer-presets" aria-label="Timer presets">
+              <button type="button" data-minutes="5">5m</button><button class="active" type="button" data-minutes="15">15m</button><button type="button" data-minutes="30">30m</button>
+            </div>
+            <div class="timer-actions"><button class="primary-button" id="timerToggle" type="button">Start timer</button><button class="icon-button subtle" id="timerReset" type="button" aria-label="Reset timer">↻</button></div>
+          </section>
+
+          <section class="card art-card" id="art" data-widget="art" aria-labelledby="artTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Family gallery</p><h2 id="artTitle">Art show</h2></div><span class="art-count" id="artCount">2 pieces</span></div>
+            <div class="art-wall" id="artWall">
+              <div class="art-piece art-one" role="img" aria-label="Colorful sample artwork"><span>MY<br>HAPPY<br>PLACE</span></div>
+              <div class="art-piece art-two" role="img" aria-label="Abstract sample artwork"><span>★</span></div>
+              <label class="add-art"><input id="artUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg><span>Add art</span></label>
+            </div>
+          </section>
+        </div>
+        </div>
+
+        <section class="app-view full-app-view" id="choresView" data-app-view="chores" hidden>
+          <header class="view-header"><div><p class="eyebrow">Full chore board</p><h1>Chores & approvals</h1><p>Track today’s work, review photo evidence, and catch anything falling behind.</p></div><button class="primary-button adult-only" type="button" id="fullAddChoreButton">+ Add chore</button></header>
+          <div class="review-queue-panel" id="reviewQueuePanel" hidden><span class="review-symbol">✓</span><div><strong id="reviewQueueTitle">A chore is ready to review</strong><span id="reviewQueueSummary">Open the highlighted chore to compare its photos.</span></div></div>
+          <div class="warning-panel" id="warningPanel"><span class="warning-symbol">!</span><div><strong id="warningTitle">2 chores need attention</strong><span id="warningSummary">One is overdue and one has been missed repeatedly.</span></div></div>
+          <div class="filter-row" aria-label="Filter chores by person">
+            <button class="active" data-chore-filter="all" type="button">Everyone</button><button data-chore-filter="tyler" type="button">Tyler</button><button data-chore-filter="rose" type="button">Rose</button><button data-chore-filter="harper" type="button">Harper</button><button data-chore-filter="griffin" type="button">Griffin</button>
+          </div>
+          <div class="full-chore-list" id="fullChoreList"></div>
+        </section>
+
+        <section class="app-view full-app-view" id="rewardsView" data-app-view="rewards" hidden>
+          <header class="view-header"><div><p class="eyebrow">Kid motivation</p><h1>Rewards</h1><p>Celebrate progress, review balances, and keep the next goal within reach.</p></div></header>
+          <div class="claim-notice-panel" id="claimNoticePanel" hidden></div>
+          <div class="reward-overview" id="rewardOverview"></div>
+        </section>
+
+        <section class="app-view full-app-view" id="calendarView" data-app-view="calendar" hidden>
+          <header class="view-header"><div><p class="eyebrow">Shared schedule</p><h1>Family calendar</h1><p>Imported schedules and family-added plans live together here.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="connectCalendarButton" type="button">Connect calendar</button><button class="primary-button" id="addEventButton" type="button">+ Add event</button></div></header>
+          <div class="week-strip" id="weekStrip"></div>
+          <div class="calendar-agenda" id="calendarAgenda"></div>
+        </section>
+
+        <section class="app-view full-app-view" id="artView" data-app-view="art" hidden>
+          <header class="view-header"><div><p class="eyebrow">Made by the family</p><h1>Art show</h1><p>Tap any piece for the full-screen view, or make something new together.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="openPaintButton" type="button">🎨 Finger paint</button><label class="primary-upload"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg>Add artwork</label></div></header>
+          <div class="gallery-grid" id="fullArtWall"></div>
+        </section>
+
+        <section class="app-view full-app-view" id="settingsView" data-app-view="settings" hidden>
+          <header class="view-header"><div><p class="eyebrow">HouseHelper controls</p><h1>Settings</h1><p>Personalize the kitchen dashboard and family experience.</p></div></header>
+          <div class="settings-grid">
+            <button class="settings-tile" id="settingsLayoutButton" type="button"><span class="settings-icon"><svg><use href="#icon-settings"></use></svg></span><span><strong>Home layout</strong><small>Resize, reorder, or hide widgets</small></span><b>›</b></button>
+            <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-star"></use></svg></span><span><strong>Profile themes</strong><small>Colors, type, icon size, and priorities</small></span><b>›</b></button>
+            <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-moon"></use></svg></span><span><strong>Sleep & wake</strong><small>Calm mode currently begins at 9:00 PM</small></span><b>›</b></button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="mobile-nav" aria-label="Mobile navigation">
+        <button class="active" data-view="home" type="button"><svg><use href="#icon-home"></use></svg><span>Home</span></button>
+        <button data-view="chores" type="button"><svg><use href="#icon-camera"></use></svg><span>Chores</span></button>
+        <button data-view="rewards" type="button"><svg><use href="#icon-star"></use></svg><span>Rewards</span></button>
+        <button data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Schedule</span></button>
+        <button data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art</span></button>
+        <button data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
+      </nav>
+    </div>
+
+    <div class="calm-screen" id="calmScreen" aria-hidden="true">
+      <button class="wake-area" id="wakeButton" type="button" aria-label="Exit calm mode">
+        <span class="calm-date" id="calmDate"></span>
+        <strong class="calm-time" id="calmTime"></strong>
+        <span class="calm-message">The house is resting</span>
+        <span class="wake-hint">Tap anywhere to wake</span>
+      </button>
+    </div>
+
+    <dialog id="profileDialog" class="app-dialog profile-dialog">
+      <form method="dialog" class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow">Dashboard view</p><h2>Who’s using HouseHelper?</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+        <div class="dialog-body">
+          <div class="profile-grid" role="list" aria-label="Dashboard profiles">
+            <button class="profile-option family" data-profile="family" type="button"><span class="profile-option-avatar">⌂</span><span><strong>Family</strong><small>Shared dashboard</small></span><span class="selected-check">✓</span></button>
+            <button class="profile-option tyler" data-profile="tyler" type="button"><span class="profile-option-avatar">T</span><span><strong>Tyler</strong><small>Father · Adult</small></span><span class="selected-check">✓</span></button>
+            <button class="profile-option rose" data-profile="rose" type="button"><span class="profile-option-avatar">R</span><span><strong>Rose</strong><small>Mother · Adult</small></span><span class="selected-check">✓</span></button>
+            <button class="profile-option harper" data-profile="harper" type="button"><span class="profile-option-avatar">H</span><span><strong>Harper</strong><small>Daughter · Kid</small></span><span class="selected-check">✓</span></button>
+            <button class="profile-option griffin" data-profile="griffin" type="button"><span class="profile-option-avatar">G</span><span><strong>Griffin</strong><small>Son · Kid</small></span><span class="selected-check">✓</span></button>
+          </div>
+          <p class="profile-note"><svg><use href="#icon-clock"></use></svg><span>Personal dashboards return to Family after three minutes without activity. Shared timers and alerts keep running.</span></p>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="passcodeDialog" class="app-dialog passcode-dialog">
+      <form method="dialog" class="dialog-panel" id="passcodeForm">
+        <div class="dialog-header"><div><p class="eyebrow">Parent verification</p><h2 id="passcodeTitle">Enter parent passcode</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <p class="passcode-help" id="passcodeHelp">Choose a parent, then enter their four-digit passcode.</p>
+          <div class="parent-picker" id="parentPicker" aria-label="Choose parent account">
+            <button class="active" data-parent="tyler" type="button"><span>T</span>Tyler</button>
+            <button data-parent="rose" type="button"><span>R</span>Rose</button>
+          </div>
+          <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required /></label>
+          <p class="passcode-error" id="passcodeError" role="alert"></p>
+          <p class="security-note">Passcodes protect parent actions on this device. The first login for each parent creates their passcode.</p>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="unlockButton" value="unlock" type="submit">Continue</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="choreDetailDialog" class="app-dialog chore-detail-dialog">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow" id="detailPerson">Chore review</p><h2 id="detailTitle">Chore details</h2></div><button class="close-button" aria-label="Close" id="closeChoreDetail" type="button">×</button></div>
+        <div class="dialog-body">
+          <div class="detail-status" id="detailStatus"></div>
+          <div class="evidence-grid">
+            <figure><figcaption>Before</figcaption><div class="evidence-frame"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></div></figure>
+            <figure><figcaption>After</figcaption><div class="evidence-frame"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></div></figure>
+          </div>
+          <div class="approval-record" id="approvalRecord"></div>
+        </div>
+        <div class="dialog-footer" id="detailActions"><button class="secondary-button request-redo-button" id="requestRedoButton" type="button">Request new photos</button><button class="primary-button" id="approveChoreButton" type="button">Verify parent & approve</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="choreFormDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="choreForm">
+        <div class="dialog-header"><div><p class="eyebrow">Parent chore builder</p><h2>Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid">
+          <label class="field field-wide"><span>What needs doing?</span><input id="choreTitleInput" maxlength="60" placeholder="Clean the bathroom mirror" required /></label>
+          <label class="field"><span>Assign to</span><select id="choreAssigneeInput" required><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <label class="field"><span>Room or category</span><input id="choreAreaInput" maxlength="35" placeholder="Bathroom" required /></label>
+          <label class="field"><span>Points</span><input id="chorePointsInput" type="number" min="0" max="500" value="10" inputmode="numeric" required /></label>
+          <label class="field"><span>Due date</span><input id="choreDueDateInput" type="date" required /></label>
+          <label class="field"><span>Due time</span><input id="choreDueTimeInput" type="time" value="18:00" required /></label>
+          <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until a parent reviews the evidence.</small></span></label>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add chore</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="layoutDialog" class="app-dialog layout-dialog">
+      <form method="dialog" class="dialog-panel" id="layoutForm">
+        <div class="dialog-header"><div><p class="eyebrow">Touch layout editor</p><h2>Arrange Home widgets</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+        <div class="dialog-body">
+          <p class="layout-help">Move widgets, change their width, or hide anything you don’t need. Each profile keeps its own layout.</p>
+          <div class="layout-list" id="layoutList"></div>
+        </div>
+        <div class="dialog-footer"><button class="text-button" id="resetLayoutButton" type="button">Reset layout</button><button class="secondary-button" value="cancel" type="submit">Cancel</button><button class="primary-button" value="save" type="submit">Save layout</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="rewardDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="rewardForm">
+        <div class="dialog-header"><div><p class="eyebrow">Adult controls</p><h2 id="rewardDialogTitle">Manage Harper’s rewards</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+        <div class="dialog-body">
+          <div class="point-control"><span>Current balance</span><strong><span id="dialogPoints">80</span> pts</strong></div>
+          <p class="field-label">Quick adjustment</p>
+          <div class="point-buttons"><button type="button" data-points="-5">−5</button><button type="button" data-points="5">+5</button><button type="button" data-points="10">+10</button><button type="button" data-points="20">+20</button></div>
+          <p class="field-label">Current reward choices</p>
+          <div class="managed-reward-list" id="managedRewardList"></div>
+          <div class="reward-add-grid">
+            <label class="field"><span>New reward</span><input id="rewardNameInput" maxlength="40" placeholder="Pick Friday’s movie" /></label>
+            <label class="field"><span>Cost</span><input id="rewardTargetInput" type="number" min="10" max="9999" inputmode="numeric" placeholder="75" /></label>
+            <label class="field reward-emoji-field"><span>Emoji</span><input id="rewardEmojiInput" maxlength="4" value="🎁" /></label>
+          </div>
+          <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Make progress feel reachable.</strong><br /><span id="rewardNoteName">Harper</span> currently earns 10–20 points per chore.</p></div>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveRewardButton" value="default" type="submit">Save changes</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="rewardClaimDialog" class="app-dialog reward-claim-dialog">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow" id="claimEyebrow">Reward shop</p><h2 id="claimTitle">Claim this reward?</h2></div><button class="close-button" id="closeClaimDialog" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-body reward-claim-body" id="claimBody"></div>
+        <div class="dialog-footer"><button class="secondary-button" id="cancelClaimButton" type="button">Not yet</button><button class="secondary-dark-button" id="scheduleClaimButton" type="button" hidden>Schedule it</button><button class="primary-button" id="confirmClaimButton" type="button">Yes, continue</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="calendarEventDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="calendarEventForm">
+        <div class="dialog-header"><div><p class="eyebrow">Family calendar</p><h2 id="calendarEventTitle">Add an event</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid">
+          <label class="field field-wide"><span>Event name</span><input id="eventNameInput" maxlength="70" placeholder="Dentist appointment" required /></label>
+          <label class="field"><span>Who is it for?</span><select id="eventPeopleInput" required><option value="family">Everyone</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option><option value="kids">Harper & Griffin</option></select></label>
+          <label class="field"><span>Location</span><input id="eventLocationInput" maxlength="50" placeholder="Home" /></label>
+          <label class="field"><span>Date</span><input id="eventDateInput" type="date" required /></label>
+          <label class="field"><span>Time</span><input id="eventTimeInput" type="time" required /></label>
+          <p class="trust-note field-wide">Everyone—including Harper and Griffin—can add family calendar items. Connected calendars will appear beside these dashboard-created events.</p>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add to calendar</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="artViewerDialog" class="art-viewer-dialog">
+      <div class="art-viewer-panel">
+        <button class="art-viewer-close" id="closeArtViewer" type="button" aria-label="Close full-screen artwork">×</button>
+        <div class="art-viewer-stage" id="artViewerStage"></div>
+        <div class="art-viewer-caption"><strong id="artViewerTitle">Family artwork</strong><span id="artViewerArtist"></span></div>
+      </div>
+    </dialog>
+
+    <dialog id="paintDialog" class="paint-dialog">
+      <div class="paint-panel">
+        <div class="paint-header"><div><p class="eyebrow">Finger paint</p><h2>Make something fun</h2></div><button class="close-button" id="closePaintButton" type="button" aria-label="Close painter">×</button></div>
+        <div class="paint-toolbar" aria-label="Paint colors">
+          <div class="paint-colors" id="paintColors"><button class="active" data-color="#ef4444" style="--swatch:#ef4444" type="button" aria-label="Red"></button><button data-color="#facc15" style="--swatch:#facc15" type="button" aria-label="Yellow"></button><button data-color="#2563eb" style="--swatch:#2563eb" type="button" aria-label="Blue"></button><button data-color="#f97316" style="--swatch:#f97316" type="button" aria-label="Orange"></button><button data-color="#22c55e" style="--swatch:#22c55e" type="button" aria-label="Green"></button><button data-color="#9333ea" style="--swatch:#9333ea" type="button" aria-label="Purple"></button></div>
+          <div class="paint-actions"><button class="secondary-dark-button" id="paintEraser" type="button">Eraser</button><button class="secondary-dark-button" id="clearPaint" type="button">Clear</button><button class="primary-button" id="savePainting" type="button">Save to art show</button></div>
+        </div>
+        <div class="paint-canvas-wrap"><canvas id="paintCanvas" width="1200" height="720" aria-label="Finger painting canvas"></canvas></div>
+      </div>
+    </dialog>
+
+    <dialog id="photoDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel photo-panel" id="photoForm">
+        <div class="dialog-header"><div><p class="eyebrow" id="photoEyebrow">Chore proof</p><h2 id="photoTitle">Add a before photo</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+        <div class="dialog-body">
+          <p class="photo-help" id="photoHelp">Take a quick picture before you begin. It makes the finished result extra satisfying.</p>
+          <label class="photo-drop" id="photoDrop"><input id="chorePhoto" type="file" accept="image/*" capture="environment" /><span class="camera-circle"><svg><use href="#icon-camera"></use></svg></span><strong>Take or choose a photo</strong><span>JPG, PNG, or HEIC</span><img id="photoPreview" alt="Selected chore photo preview" /></label>
+        </div>
+        <div class="dialog-footer"><button class="text-button" id="skipPhotoButton" value="skip" type="submit">Skip for now</button><button class="primary-button" id="savePhotoButton" value="save" type="submit" disabled>Save photo</button></div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

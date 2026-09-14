@@ -1,0 +1,14 @@
+{
+  "name": "HouseHelper Family Dashboard",
+  "short_name": "HouseHelper",
+  "description": "Chores, rewards, schedules, timers, and family moments in one place.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2f4ef",
+  "theme_color": "#14392f",
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
