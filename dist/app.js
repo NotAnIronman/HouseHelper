@@ -26,10 +26,12 @@ const PROFILES = {
   griffin: { name: "Griffin", shortRole: "Son · Kid", avatar: "G", adult: false, rewardOwner: "griffin" },
 };
 
-const VIEWS = ["home", "chores", "rewards", "calendar", "art", "settings"];
+const VIEWS = ["home", "chores", "habits", "lists", "rewards", "calendar", "art", "settings"];
 const WIDGETS = [
   { id: "rewards", name: "Reward radar", icon: "★", detail: "Kid reward progress" },
   { id: "chores", name: "Today’s chores", icon: "✓", detail: "Assigned work and approvals" },
+  { id: "habits", name: "Daily routines", icon: "↻", detail: "Healthy habits and streaks" },
+  { id: "lists", name: "Family list", icon: "☰", detail: "Groceries and shared notes" },
   { id: "attention", name: "Reminders", icon: "!", detail: "Overdue and missed chores" },
   { id: "calendar", name: "Family schedule", icon: "□", detail: "Upcoming calendar items" },
   { id: "timer", name: "Quick timer", icon: "◷", detail: "Shared live timer" },
@@ -39,6 +41,8 @@ const WIDGETS = [
 const BASE_LAYOUT = [
   { id: "rewards", size: "half", visible: true },
   { id: "chores", size: "half", visible: true },
+  { id: "habits", size: "half", visible: true },
+  { id: "lists", size: "half", visible: true },
   { id: "attention", size: "compact", visible: true },
   { id: "calendar", size: "compact", visible: true },
   { id: "timer", size: "compact", visible: true },
@@ -53,6 +57,8 @@ const DEFAULT_LAYOUTS = {
     { id: "rewards", size: "half", visible: true },
     { id: "art", size: "half", visible: true },
     { id: "chores", size: "half", visible: true },
+    { id: "habits", size: "half", visible: true },
+    { id: "lists", size: "compact", visible: true },
     { id: "attention", size: "compact", visible: true },
     { id: "timer", size: "compact", visible: true },
     { id: "calendar", size: "compact", visible: true },
@@ -142,6 +148,18 @@ const DEFAULT_EVENTS = [
   { id: "event-dropoff", title: "School drop-off", people: "kids", location: "School", date: datePlus(1), time: "08:00", source: "connected" },
 ];
 
+const DEFAULT_HABITS = [
+  { id: "habit-harper-teeth", person: "harper", name: "Brush teeth", icon: "🪥", schedule: "daily", time: "19:30" },
+  { id: "habit-griffin-read", person: "griffin", name: "Read for 20 minutes", icon: "📚", schedule: "daily", time: "19:00" },
+  { id: "habit-rose-water", person: "rose", name: "Drink water", icon: "💧", schedule: "daily", time: "09:00" },
+  { id: "habit-tyler-move", person: "tyler", name: "Move for 20 minutes", icon: "🏃", schedule: "weekdays", time: "17:30" },
+];
+
+const DEFAULT_LIST_ITEMS = [
+  { id: "list-milk", text: "Milk", category: "groceries", completed: false, addedBy: "family", createdAt: new Date().toISOString() },
+  { id: "list-dog-food", text: "Dog food", category: "household", completed: false, addedBy: "family", createdAt: new Date().toISOString() },
+];
+
 const storedRewards = readStoredObject("hh-rewards");
 const initialProfile = localStorage.getItem("hh-profile");
 const initialView = location.hash.replace("#", "");
@@ -160,12 +178,25 @@ const state = {
   schedulingClaimId: null,
   chores: readStoredObject("hh-chores"),
   customChores: readStoredArray("hh-custom-chores", []),
+  removedChoreIds: readStoredArray("hh-removed-chores", []),
   layouts: readStoredObject("hh-layouts"),
   layoutDraft: [],
   choreFilter: "all",
   events: readStoredArray("hh-events", clone(DEFAULT_EVENTS)),
+  editingEventId: null,
   selectedCalendarDate: datePlus(0),
+  habits: readStoredArray("hh-habits", clone(DEFAULT_HABITS)),
+  habitCompletions: readStoredObject("hh-habit-completions"),
+  habitFilter: "all",
+  listItems: readStoredArray("hh-shared-list", clone(DEFAULT_LIST_ITEMS)),
+  listFilter: "all",
+  familyNote: localStorage.getItem("hh-family-note") || "Dinner together at 6:30 · Bring school forms to the counter.",
+  activity: readStoredArray("hh-activity", []),
+  vacationMode: localStorage.getItem("hh-vacation-mode") === "true",
   artworks: readStoredArray("hh-artworks", clone(DEFAULT_ARTWORKS)),
+  showArchivedArt: false,
+  activeArtId: null,
+  pendingDelete: null,
   timerSeconds: 15 * 60,
   timerInitial: 15 * 60,
   timerRunning: false,
@@ -202,6 +233,10 @@ const elements = {
   layoutDialog: $("#layoutDialog"),
   artViewerDialog: $("#artViewerDialog"),
   paintDialog: $("#paintDialog"),
+  deleteConfirmDialog: $("#deleteConfirmDialog"),
+  habitDialog: $("#habitDialog"),
+  activityDialog: $("#activityDialog"),
+  backupDialog: $("#backupDialog"),
   timerDisplay: $("#timerDisplay"),
   calmScreen: $("#calmScreen"),
   toast: $("#toast"),
@@ -240,14 +275,51 @@ function persistRewards() { localStorage.setItem("hh-rewards", JSON.stringify(st
 function persistClaims() { localStorage.setItem("hh-reward-claims", JSON.stringify(state.rewardClaims)); }
 function persistChores() { localStorage.setItem("hh-chores", JSON.stringify(state.chores)); }
 function persistCustomChores() { localStorage.setItem("hh-custom-chores", JSON.stringify(state.customChores)); }
+function persistRemovedChores() { localStorage.setItem("hh-removed-chores", JSON.stringify(state.removedChoreIds)); }
 function persistEvents() { localStorage.setItem("hh-events", JSON.stringify(state.events)); }
+function persistHabits() { localStorage.setItem("hh-habits", JSON.stringify(state.habits)); }
+function persistHabitCompletions() { localStorage.setItem("hh-habit-completions", JSON.stringify(state.habitCompletions)); }
+function persistListItems() { localStorage.setItem("hh-shared-list", JSON.stringify(state.listItems)); }
+function persistActivity() { localStorage.setItem("hh-activity", JSON.stringify(state.activity)); }
 function persistArtworks() { localStorage.setItem("hh-artworks", JSON.stringify(state.artworks)); }
-function allChores() { return DEFAULT_CHORES.concat(state.customChores); }
+function allChores() { return DEFAULT_CHORES.concat(state.customChores).filter((chore) => !state.removedChoreIds.includes(chore.id)); }
 function currentReward() { return state.rewards[state.rewardOwner]; }
 function rewardOwnerName() { return PROFILES[state.rewardOwner].name; }
-function choreStatus(chore) { return state.chores[chore.id] && state.chores[chore.id].status || chore.initialStatus; }
+function choreStatus(chore) {
+  const record = state.chores[chore.id] || {};
+  if (chore.repeat && chore.repeat !== "none" && record.occurrenceDate !== datePlus(0)) return chore.initialStatus;
+  return record.status || chore.initialStatus;
+}
 function choreById(id) { return allChores().find((chore) => chore.id === id); }
 function rewardById(owner, id) { return state.rewards[owner] && state.rewards[owner].items.find((item) => item.id === id); }
+
+function isChoreScheduledToday(chore) {
+  if (state.vacationMode && chore.repeat && chore.repeat !== "none") return false;
+  if (!chore.repeat || chore.repeat === "none" || chore.repeat === "daily") return true;
+  const day = new Date().getDay();
+  if (chore.repeat === "weekdays") return day >= 1 && day <= 5;
+  if (chore.repeat === "weekly" && chore.dueDate) return parseDateKey(chore.dueDate).getDay() === day;
+  return true;
+}
+
+function logActivity(message, icon) {
+  state.activity.unshift({
+    id: makeId("activity"),
+    message: message,
+    icon: icon || "•",
+    actor: PROFILES[state.profile].name,
+    at: new Date().toISOString(),
+  });
+  state.activity = state.activity.slice(0, 80);
+  persistActivity();
+}
+
+function repeatLabel(chore) {
+  if (chore.repeat === "daily") return "Repeats daily";
+  if (chore.repeat === "weekdays") return "Repeats weekdays";
+  if (chore.repeat === "weekly") return "Repeats weekly";
+  return "";
+}
 
 function nextReward(owner) {
   const account = state.rewards[owner];
@@ -261,6 +333,7 @@ function nextReward(owner) {
 
 function warningFor(chore) {
   if (choreStatus(chore) === "done") return "";
+  if (!isChoreScheduledToday(chore)) return "";
   const record = state.chores[chore.id] || {};
   if (record.status === "pending") return "";
   if (chore.dueDate && (chore.dueDate < datePlus(0) || chore.dueDate === datePlus(0) && chore.dueTime && chore.dueTime < new Date().toTimeString().slice(0, 5))) return "Overdue";
@@ -274,7 +347,7 @@ function sortReviewFirst(chores) {
 }
 
 function visibleHomeChores() {
-  const chores = allChores();
+  const chores = allChores().filter((chore) => isChoreScheduledToday(chore));
   if (state.profile === "family") return sortReviewFirst(chores.filter((chore) => chore.familyPriority || choreStatus(chore) === "pending"));
   if (PROFILES[state.profile].adult) return sortReviewFirst(chores.filter((chore) => chore.person === state.profile || choreStatus(chore) === "pending"));
   return chores.filter((chore) => chore.person === state.profile);
@@ -284,13 +357,13 @@ function canReviewFromCurrentView() {
   return state.profile === "family" || PROFILES[state.profile].adult;
 }
 
-function choreMarkup(chore, showPerson) {
+function choreMarkup(chore, showPerson, fullBoard) {
   const record = state.chores[chore.id] || {};
   const status = choreStatus(chore);
   const isDone = status === "done";
   const warning = warningFor(chore);
   const due = chore.dueDate ? "Due " + parseDateKey(chore.dueDate).toLocaleDateString([], { month: "short", day: "numeric" }) + (chore.dueTime ? " · " + formatTime(chore.dueTime) : "") : null;
-  const meta = [showPerson ? PROFILES[chore.person].name : null, chore.area, chore.points ? "+" + chore.points + " points" : null, due].filter(Boolean).join(" · ");
+  const meta = [showPerson ? PROFILES[chore.person].name : null, chore.area, chore.points ? "+" + chore.points + " points" : null, repeatLabel(chore), due].filter(Boolean).join(" · ");
   let action = "";
   if (status === "ready" || status === "in-progress") {
     const actionName = status === "in-progress" ? "Finish" : "Start";
@@ -300,9 +373,11 @@ function choreMarkup(chore, showPerson) {
   } else {
     action = '<span class="status-stack"><span class="status-badge approved">' + (record.approvedBy ? "Approved" : "Completed") + "</span>" + (record.approvedBy ? '<span class="approval-by">by ' + escapeHtml(record.approvedBy) + "</span>" : "") + "</span>";
   }
+  const removeButton = fullBoard && canReviewFromCurrentView() ? '<button class="chore-delete" data-delete-chore="' + chore.id + '" type="button" aria-label="Remove ' + escapeHtml(chore.title) + '">×</button>' : "";
+  const controls = removeButton ? '<span class="chore-action-group">' + action + removeButton + "</span>" : action;
   return '<article class="chore-item' + (isDone ? " done" : "") + '" data-chore-id="' + chore.id + '" data-person="' + chore.person + '" data-state="' + status + '" data-points="' + chore.points + '" tabindex="' + (status === "pending" || status === "done" ? "0" : "-1") + '">' +
     (isDone ? '<span class="chore-check"><svg><use href="#icon-check"></use></svg></span>' : '<span class="chore-icon">' + chore.icon + "</span>") +
-    '<div class="chore-copy"><strong>' + escapeHtml(chore.title) + "</strong><span>" + escapeHtml(meta) + "</span>" + (warning ? '<span class="warning-inline">' + escapeHtml(warning) + "</span>" : "") + "</div>" + action + "</article>";
+    '<div class="chore-copy"><strong>' + escapeHtml(chore.title) + "</strong><span>" + escapeHtml(meta) + "</span>" + (warning ? '<span class="warning-inline">' + escapeHtml(warning) + "</span>" : "") + "</div>" + controls + "</article>";
 }
 
 function renderChores() {
@@ -325,7 +400,7 @@ function filteredFullChores() {
 }
 
 function renderFullChores() {
-  $("#fullChoreList").innerHTML = filteredFullChores().map((chore) => choreMarkup(chore, true)).join("");
+  $("#fullChoreList").innerHTML = filteredFullChores().map((chore) => choreMarkup(chore, true, true)).join("");
   $$("[data-chore-filter]").forEach((button) => button.classList.toggle("active", button.dataset.choreFilter === state.choreFilter));
   const warnings = allChores().filter((chore) => warningFor(chore));
   $("#warningTitle").textContent = warnings.length + " " + (warnings.length === 1 ? "chore needs" : "chores need") + " attention";
@@ -338,7 +413,8 @@ function renderFullChores() {
 }
 
 function renderAttention() {
-  const items = allChores().filter((chore) => warningFor(chore)).slice(0, 3).map((chore) => ({
+  const visibleWarnings = PROFILES[state.profile].adult || state.profile === "family" ? allChores() : allChores().filter((chore) => chore.person === state.profile);
+  const items = visibleWarnings.filter((chore) => warningFor(chore)).slice(0, 3).map((chore) => ({
     icon: "!",
     title: chore.title,
     detail: PROFILES[chore.person].name + " · " + warningFor(chore),
@@ -350,6 +426,7 @@ function renderAttention() {
       detail: "Open Rewards to acknowledge or schedule it",
     }));
   }
+  $("#attentionTitle").textContent = state.profile === "harper" || state.profile === "griffin" ? "Your reminders" : "Household reminders";
   $("#attentionCount").textContent = items.length;
   $("#homeAttentionList").innerHTML = items.slice(0, 3).map((item) => '<div class="attention-item"><span>' + item.icon + '</span><div><strong>' + escapeHtml(item.title) + "</strong><small>" + escapeHtml(item.detail) + "</small></div></div>").join("") || '<div class="attention-item"><span>✓</span><div><strong>Everything is on track</strong><small>No overdue chores or new claims</small></div></div>';
   const alertCount = PROFILES[state.profile].adult ? state.rewardClaims.filter((claim) => !claim.acknowledged).length : 0;
@@ -362,25 +439,19 @@ function renderAttention() {
 
 function renderRewards() {
   const account = currentReward();
-  const item = nextReward(state.rewardOwner);
   const owner = rewardOwnerName();
-  const target = Math.max(10, Number(item.cost) || 10);
   const points = Math.max(0, Number(account.points) || 0);
-  const progress = Math.min(100, Math.round(points / target * 100));
-  const remaining = Math.max(0, target - points);
-  $("#rewardTitle").textContent = remaining ? owner + " is closing in" : owner + " can claim a reward";
+  const canClaim = state.profile === state.rewardOwner;
+  $("#rewardTitle").textContent = owner + "’s reward shop";
   $("#pointCount").textContent = points;
-  $("#targetCount").textContent = target;
-  $("#rewardName").textContent = item.name;
-  $(".reward-emoji").textContent = item.emoji;
-  $("#pointsLeft").textContent = remaining ? remaining + " to go" : "Ready!";
-  $("#progressOrbit").style.setProperty("--progress", progress + "%");
-  $("#progressBar").style.width = progress + "%";
   $("#dialogPoints").textContent = points;
   $("#rewardDialogTitle").textContent = "Manage " + owner + "’s rewards";
   $("#rewardNoteName").textContent = owner;
-  $("#encouragement").innerHTML = remaining === 0 ? "<strong>" + escapeHtml(item.name) + " is ready!</strong> Open Rewards to claim it." : "<strong>" + Math.max(1, Math.ceil(remaining / 20)) + " more " + (remaining <= 20 ? "chore" : "chores") + "</strong> could unlock it this week.";
-  $(".milestones").innerHTML = account.items.slice(0, 3).map((reward) => '<div class="milestone ' + (points >= reward.cost ? "reached" : reward.id === item.id ? "current" : "") + '"><span>' + (points >= reward.cost ? "✓" : escapeHtml(reward.emoji)) + "</span><strong>" + reward.cost + "</strong><small>" + escapeHtml(reward.name) + "</small></div>").join("");
+  $("#homeRewardChoices").innerHTML = account.items.slice(0, 3).map((reward) => {
+    const affordable = points >= reward.cost;
+    return '<button class="home-reward-choice ' + (affordable ? "affordable" : "") + '" data-claim-owner="' + state.rewardOwner + '" data-claim-reward="' + reward.id + '" type="button" ' + (canClaim ? "" : "disabled") + '><span>' + escapeHtml(reward.emoji) + '</span><span><strong>' + escapeHtml(reward.name) + "</strong><small>" + (affordable ? "Tap to buy" : reward.cost - points + " more needed") + "</small></span><b>" + reward.cost + "</b></button>";
+  }).join("");
+  $("#encouragement").textContent = canClaim ? "Tap a reward to buy it. Your points only change after the second confirmation." : "Points are saved until they are spent and never expire.";
   $$("[data-reward-owner]").forEach((button) => button.classList.toggle("active", button.dataset.rewardOwner === state.rewardOwner));
   renderRewardOverview();
   renderClaimNotices();
@@ -451,7 +522,9 @@ function eventMarkup(event, compact) {
     const parts = formatted.split(" ");
     timeHtml = "<strong>" + escapeHtml(parts[0] || "") + "</strong><span>" + escapeHtml(parts[1] || "") + "</span>";
   }
-  return '<article class="event-item"><time>' + timeHtml + '</time><span class="event-bar ' + eventBarClass(event) + '"></span><div><strong>' + escapeHtml(event.title) + "</strong><span>" + escapeHtml(peopleLabel(event.people) + (event.location ? " · " + event.location : "")) + "</span></div></article>";
+  const tag = compact ? "article" : "button";
+  const attributes = compact ? "" : ' type="button" data-event-id="' + event.id + '" aria-label="Edit ' + escapeHtml(event.title) + '"';
+  return '<' + tag + ' class="event-item' + (compact ? "" : " calendar-event-row") + '"' + attributes + '><time>' + timeHtml + '</time><span class="event-bar ' + eventBarClass(event) + '"></span><div><strong>' + escapeHtml(event.title) + "</strong><span>" + escapeHtml(peopleLabel(event.people) + (event.location ? " · " + event.location : "")) + "</span></div>" + (compact ? "" : '<span class="event-edit-hint">Edit ›</span>') + '</' + tag + '>';
 }
 
 function renderCalendar() {
@@ -512,9 +585,201 @@ function artworkMarkup(piece, full) {
 }
 
 function renderArt() {
-  $("#artWall").innerHTML = state.artworks.slice(-2).map((piece) => artworkMarkup(piece, false)).join("") + '<label class="add-art"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment"><svg><use href="#icon-camera"></use></svg><span>Add art</span></label>';
-  $("#fullArtWall").innerHTML = state.artworks.map((piece) => artworkMarkup(piece, true)).join("");
-  $("#artCount").textContent = state.artworks.length + " " + (state.artworks.length === 1 ? "piece" : "pieces");
+  const showcase = state.artworks.filter((piece) => !piece.archived);
+  const archived = state.artworks.filter((piece) => piece.archived);
+  const gallery = state.showArchivedArt ? archived : showcase;
+  $("#artWall").innerHTML = showcase.slice(-2).map((piece) => artworkMarkup(piece, false)).join("") + '<label class="add-art"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment"><svg><use href="#icon-camera"></use></svg><span>Add art</span></label>';
+  $("#fullArtWall").innerHTML = gallery.length ? gallery.map((piece) => artworkMarkup(piece, true)).join("") : '<div class="empty-gallery"><strong>' + (state.showArchivedArt ? "The archive is empty" : "The showcase is empty") + '</strong><span>' + (state.showArchivedArt ? "Archived artwork stays safely stored here." : "Upload a picture or make a finger painting.") + "</span></div>";
+  $("#artCount").textContent = showcase.length + " " + (showcase.length === 1 ? "piece" : "pieces");
+  $("#showArchiveButton").textContent = state.showArchivedArt ? "Back to showcase" : "View archive (" + archived.length + ")";
+  $("#showArchiveButton").classList.toggle("active", state.showArchivedArt);
+}
+
+function isHabitScheduledOn(habit, date) {
+  const day = date.getDay();
+  if (habit.schedule === "weekdays") return day >= 1 && day <= 5;
+  if (habit.schedule === "weekends") return day === 0 || day === 6;
+  return true;
+}
+
+function habitDates(habitId) {
+  return Array.isArray(state.habitCompletions[habitId]) ? state.habitCompletions[habitId] : [];
+}
+
+function habitDoneToday(habit) {
+  return habitDates(habit.id).includes(datePlus(0));
+}
+
+function habitStreak(habit) {
+  const completed = new Set(habitDates(habit.id));
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0);
+  if (isHabitScheduledOn(habit, cursor) && !completed.has(dateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  for (let guard = 0; guard < 366; guard += 1) {
+    if (!isHabitScheduledOn(habit, cursor)) {
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+    if (!completed.has(dateKey(cursor))) break;
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function visibleHabits(fullBoard) {
+  let habits = state.habits.filter((habit) => fullBoard || isHabitScheduledOn(habit, new Date()));
+  if (state.profile === "harper" || state.profile === "griffin") habits = habits.filter((habit) => habit.person === state.profile);
+  else if (!fullBoard && state.profile !== "family") habits = habits.filter((habit) => habit.person === state.profile);
+  if (fullBoard && state.habitFilter !== "all") habits = habits.filter((habit) => habit.person === state.habitFilter);
+  return habits;
+}
+
+function habitMarkup(habit, fullBoard) {
+  const done = habitDoneToday(habit);
+  const streak = habitStreak(habit);
+  const canDelete = fullBoard && (PROFILES[state.profile].adult || state.profile === "family");
+  return '<article class="habit-row' + (done ? " done" : "") + '" data-habit-id="' + habit.id + '"><button class="habit-check" data-toggle-habit="' + habit.id + '" type="button" aria-label="' + (done ? "Undo " : "Complete ") + escapeHtml(habit.name) + '">' + (done ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="habit-icon">' + escapeHtml(habit.icon) + '</span><span class="habit-copy"><strong>' + escapeHtml(habit.name) + '</strong><small>' + escapeHtml(PROFILES[habit.person].name + " · " + (habit.schedule === "daily" ? "Every day" : habit.schedule === "weekdays" ? "Weekdays" : "Weekends") + (habit.time ? " · " + formatTime(habit.time) : "")) + '</small></span><span class="habit-streak"><b>' + streak + '</b><small>day streak</small></span>' + (canDelete ? '<button class="row-delete" data-delete-habit="' + habit.id + '" type="button" aria-label="Delete ' + escapeHtml(habit.name) + '">×</button>' : "") + '</article>';
+}
+
+function renderHabits() {
+  const homeHabits = visibleHabits(false);
+  const completed = homeHabits.filter(habitDoneToday).length;
+  $("#habitSummary").textContent = completed + " / " + homeHabits.length;
+  $("#homeHabitList").innerHTML = homeHabits.length ? homeHabits.slice(0, 4).map((habit) => habitMarkup(habit, false)).join("") : '<div class="empty-state compact"><strong>No routines due today</strong><span>Enjoy the breathing room.</span></div>';
+  const fullHabits = visibleHabits(true);
+  $("#habitBoard").innerHTML = fullHabits.length ? fullHabits.map((habit) => habitMarkup(habit, true)).join("") : '<div class="empty-state"><strong>No habits here yet</strong><span>Tap “Add habit” to build a gentle family routine.</span></div>';
+  $$('[data-habit-filter]').forEach((button) => {
+    button.classList.toggle("active", button.dataset.habitFilter === state.habitFilter);
+    button.hidden = (state.profile === "harper" || state.profile === "griffin") && button.dataset.habitFilter !== state.profile;
+  });
+  $("#vacationBanner").hidden = !state.vacationMode;
+}
+
+function listCategoryLabel(category) {
+  return { groceries: "Groceries", household: "Household", school: "School", ideas: "Ideas" }[category] || "Family";
+}
+
+function listItemMarkup(item, compact) {
+  return '<article class="shared-list-row' + (item.completed ? " done" : "") + '" data-list-id="' + item.id + '"><button class="list-check" data-toggle-list="' + item.id + '" type="button" aria-label="' + (item.completed ? "Mark active " : "Complete ") + escapeHtml(item.text) + '">' + (item.completed ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="list-copy"><strong>' + escapeHtml(item.text) + '</strong><small>' + escapeHtml(listCategoryLabel(item.category) + " · added by " + (PROFILES[item.addedBy] ? PROFILES[item.addedBy].name : "Family")) + '</small></span>' + (!compact && (PROFILES[state.profile].adult || state.profile === "family") ? '<button class="row-delete" data-delete-list="' + item.id + '" type="button" aria-label="Delete ' + escapeHtml(item.text) + '">×</button>' : "") + '</article>';
+}
+
+function filteredListItems() {
+  if (state.listFilter === "done") return state.listItems.filter((item) => item.completed);
+  if (state.listFilter === "all") return state.listItems;
+  return state.listItems.filter((item) => item.category === state.listFilter && !item.completed);
+}
+
+function renderLists() {
+  const openItems = state.listItems.filter((item) => !item.completed);
+  $("#listCount").textContent = openItems.length + " left";
+  $("#homeListItems").innerHTML = openItems.length ? openItems.slice(0, 3).map((item) => listItemMarkup(item, true)).join("") : '<div class="empty-state compact"><strong>List cleared</strong><span>Nothing else to remember.</span></div>';
+  const filtered = filteredListItems();
+  $("#sharedList").innerHTML = filtered.length ? filtered.map((item) => listItemMarkup(item, false)).join("") : '<div class="empty-state"><strong>No list items here</strong><span>Add something the family should remember.</span></div>';
+  $("#familyNoteInput").value = state.familyNote;
+  $$('[data-list-filter]').forEach((button) => button.classList.toggle("active", button.dataset.listFilter === state.listFilter));
+}
+
+function renderVacationMode() {
+  $("#vacationModeLabel").textContent = state.vacationMode ? "On · repeating chores are paused" : "Repeating chores are running normally";
+  $("#vacationModeButton").classList.toggle("active", state.vacationMode);
+}
+
+function renderConnection() {
+  const online = navigator.onLine;
+  $("#connectionLabel").textContent = online ? "Online" : "Offline · changes saved";
+  $("#connectionStatus").classList.toggle("offline", !online);
+}
+
+function toggleHabit(habitId) {
+  const habit = state.habits.find((item) => item.id === habitId);
+  if (!habit) return;
+  if ((state.profile === "harper" || state.profile === "griffin") && habit.person !== state.profile) return;
+  const today = datePlus(0);
+  const dates = habitDates(habitId).slice();
+  const index = dates.indexOf(today);
+  if (index >= 0) dates.splice(index, 1);
+  else dates.push(today);
+  state.habitCompletions[habitId] = dates.slice(-400);
+  persistHabitCompletions();
+  logActivity((index >= 0 ? "Unchecked " : "Completed ") + habit.name + " for " + PROFILES[habit.person].name, habit.icon);
+  renderHabits();
+  showToast(index >= 0 ? "Habit reopened" : "Nice work — habit complete!");
+}
+
+function addListItem(text, category) {
+  const cleanText = text.trim();
+  if (!cleanText) return;
+  state.listItems.unshift({ id: makeId("list"), text: cleanText, category: category || "groceries", completed: false, addedBy: state.profile, createdAt: new Date().toISOString() });
+  persistListItems();
+  logActivity("Added “" + cleanText + "” to the family list", "☰");
+  renderLists();
+  showToast("Added to the family list");
+}
+
+function toggleListItem(listId) {
+  const item = state.listItems.find((entry) => entry.id === listId);
+  if (!item) return;
+  item.completed = !item.completed;
+  item.completedAt = item.completed ? new Date().toISOString() : null;
+  item.completedBy = item.completed ? state.profile : null;
+  persistListItems();
+  logActivity((item.completed ? "Completed " : "Reopened ") + "list item “" + item.text + "”", item.completed ? "✓" : "↻");
+  renderLists();
+}
+
+function toggleVacationMode(parentId) {
+  state.vacationMode = !state.vacationMode;
+  localStorage.setItem("hh-vacation-mode", String(state.vacationMode));
+  logActivity((state.vacationMode ? "Turned on" : "Turned off") + " vacation mode as " + PROFILES[parentId].name, "☀");
+  renderAll();
+  showToast(state.vacationMode ? "Vacation mode on · repeating chores paused" : "Vacation mode off · routines restored");
+}
+
+function renderActivity() {
+  $("#activityList").innerHTML = state.activity.length ? state.activity.map((item) => '<article class="activity-row"><span>' + escapeHtml(item.icon) + '</span><div><strong>' + escapeHtml(item.message) + '</strong><small>' + escapeHtml(item.actor) + " · " + new Date(item.at).toLocaleString() + '</small></div></article>').join("") : '<div class="empty-state"><strong>No activity yet</strong><span>Approvals, rewards, calendar changes, and household updates will appear here.</span></div>';
+}
+
+function openActivity() {
+  renderActivity();
+  elements.activityDialog.showModal();
+}
+
+function openBackup() {
+  elements.backupDialog.showModal();
+}
+
+function downloadBackup() {
+  const data = {};
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key && key.startsWith("hh-")) data[key] = localStorage.getItem(key);
+  }
+  const payload = { product: "HouseHelper", version: 1, exportedAt: new Date().toISOString(), data: data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "househelper-backup-" + datePlus(0) + ".json";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  logActivity("Downloaded a HouseHelper backup", "⇩");
+  showToast("Backup downloaded · chore photos are not included");
+}
+
+async function restoreBackup(file) {
+  try {
+    const payload = JSON.parse(await file.text());
+    if (!payload || payload.product !== "HouseHelper" || !payload.data || typeof payload.data !== "object") throw new Error("Invalid backup");
+    Object.entries(payload.data).forEach(([key, value]) => {
+      if (key.startsWith("hh-") && typeof value === "string") localStorage.setItem(key, value);
+    });
+    showToast("Backup restored · reloading HouseHelper");
+    setTimeout(() => location.reload(), 600);
+  } catch {
+    showToast("That file is not a valid HouseHelper backup");
+  }
 }
 
 function renderAll() {
@@ -526,6 +791,10 @@ function renderAll() {
   renderDayScore();
   renderCalendar();
   renderArt();
+  renderHabits();
+  renderLists();
+  renderVacationMode();
+  renderConnection();
   applyHomeLayout();
 }
 
@@ -563,6 +832,7 @@ function selectProfile(profileId, options) {
   state.profile = profileId;
   state.rewardOwner = PROFILES[profileId].rewardOwner;
   state.choreFilter = profileId === "family" ? "all" : profileId;
+  state.habitFilter = profileId === "family" ? "all" : profileId;
   localStorage.setItem("hh-profile", profileId);
   const profile = PROFILES[profileId];
   document.body.dataset.profile = profileId;
@@ -590,6 +860,8 @@ function navigateTo(viewId, options) {
   history.replaceState(null, "", "#" + viewId);
   window.scrollTo({ top: 0, behavior: "auto" });
   if (viewId === "chores") renderFullChores();
+  if (viewId === "habits") renderHabits();
+  if (viewId === "lists") renderLists();
   if (viewId === "rewards") {
     renderRewardOverview();
     renderClaimNotices();
@@ -662,6 +934,7 @@ async function completePhotoStep(withPhoto) {
   const id = item.dataset.choreId;
   const wasFinishing = item.dataset.state === "in-progress";
   const record = state.chores[id] || {};
+  record.occurrenceDate = datePlus(0);
   const phase = wasFinishing ? "after" : "before";
   if (withPhoto && state.selectedPhotoFile) {
     await saveEvidence(id + ":" + phase, state.selectedPhotoFile);
@@ -765,6 +1038,7 @@ async function approveChore(parentId) {
     return;
   }
   record.status = "done";
+  record.occurrenceDate = datePlus(0);
   record.approvedBy = PROFILES[parentId].name;
   record.approvedAt = new Date().toISOString();
   if (!record.pointsAwarded && chore.points && state.rewards[chore.person]) {
@@ -774,6 +1048,7 @@ async function approveChore(parentId) {
   }
   state.chores[chore.id] = record;
   persistChores();
+  logActivity(PROFILES[parentId].name + " approved “" + chore.title + "” for " + PROFILES[chore.person].name + (chore.points ? " (+" + chore.points + " points)" : ""), "✓");
   renderAll();
   await openChoreDetail(chore.id);
   showToast("Approved by " + record.approvedBy + (chore.points ? " · +" + chore.points + " points" : ""));
@@ -794,6 +1069,116 @@ async function requestNewPhotos(parentId) {
   showToast(PROFILES[parentId].name + " requested a new after photo");
 }
 
+async function removeChore(choreId, parentId) {
+  const chore = choreById(choreId);
+  if (!chore) return;
+  if (state.customChores.some((item) => item.id === choreId)) {
+    state.customChores = state.customChores.filter((item) => item.id !== choreId);
+    persistCustomChores();
+  } else if (!state.removedChoreIds.includes(choreId)) {
+    state.removedChoreIds.push(choreId);
+    persistRemovedChores();
+  }
+  delete state.chores[choreId];
+  persistChores();
+  await Promise.all([deleteEvidence(choreId + ":before"), deleteEvidence(choreId + ":after")]);
+  logActivity(PROFILES[parentId].name + " removed chore “" + chore.title + "”", "×");
+  renderAll();
+  showToast(chore.title + " removed by " + PROFILES[parentId].name);
+}
+
+function removeHabit(habitId, parentId) {
+  const habit = state.habits.find((item) => item.id === habitId);
+  if (!habit) return;
+  state.habits = state.habits.filter((item) => item.id !== habitId);
+  delete state.habitCompletions[habitId];
+  persistHabits();
+  persistHabitCompletions();
+  logActivity(PROFILES[parentId].name + " deleted habit “" + habit.name + "”", "×");
+  renderHabits();
+  showToast(habit.name + " deleted");
+}
+
+function removeListItem(listId, parentId) {
+  const item = state.listItems.find((entry) => entry.id === listId);
+  if (!item) return;
+  state.listItems = state.listItems.filter((entry) => entry.id !== listId);
+  persistListItems();
+  logActivity(PROFILES[parentId].name + " removed list item “" + item.text + "”", "×");
+  renderLists();
+  showToast("List item removed");
+}
+
+function removeCalendarEvent(eventId, parentId) {
+  const calendarEvent = state.events.find((item) => item.id === eventId);
+  if (!calendarEvent) return;
+  state.events = state.events.filter((item) => item.id !== eventId);
+  state.rewardClaims.forEach((claim) => {
+    if (claim.scheduledEventId === eventId) claim.scheduledEventId = null;
+  });
+  persistEvents();
+  persistClaims();
+  logActivity(PROFILES[parentId].name + " deleted calendar event “" + calendarEvent.title + "”", "📅");
+  renderAll();
+  showToast("Calendar event deleted");
+}
+
+function openDeleteConfirm(type, id) {
+  state.pendingDelete = { type: type, id: id };
+  if (type === "chore") {
+    const chore = choreById(id);
+    $("#deleteConfirmTitle").textContent = "Remove " + chore.title + "?";
+    $("#deleteConfirmCopy").textContent = "This removes the chore and its stored photo evidence. Repeating occurrences will stop too.";
+    $("#confirmDeleteButton").textContent = "Remove chore";
+  } else if (type === "art") {
+    const piece = state.artworks.find((item) => item.id === id);
+    $("#deleteConfirmTitle").textContent = "Delete " + piece.title + " permanently?";
+    $("#deleteConfirmCopy").textContent = "Deleting is permanent on this device. Use Archive instead if you may want the artwork later.";
+    $("#confirmDeleteButton").textContent = "Delete permanently";
+  } else if (type === "habit") {
+    const habit = state.habits.find((item) => item.id === id);
+    if (!habit) return;
+    $("#deleteConfirmTitle").textContent = "Delete " + habit.name + "?";
+    $("#deleteConfirmCopy").textContent = "This removes the routine and its streak history from this device.";
+    $("#confirmDeleteButton").textContent = "Delete habit";
+  } else if (type === "list") {
+    const item = state.listItems.find((entry) => entry.id === id);
+    if (!item) return;
+    $("#deleteConfirmTitle").textContent = "Remove “" + item.text + "”?";
+    $("#deleteConfirmCopy").textContent = "This item will be removed from the shared family list.";
+    $("#confirmDeleteButton").textContent = "Remove item";
+  } else if (type === "event") {
+    const calendarEvent = state.events.find((item) => item.id === id);
+    if (!calendarEvent) return;
+    $("#deleteConfirmTitle").textContent = "Delete “" + calendarEvent.title + "”?";
+    $("#deleteConfirmCopy").textContent = "This removes the event from the family calendar on this device.";
+    $("#confirmDeleteButton").textContent = "Delete event";
+  }
+  elements.deleteConfirmDialog.showModal();
+}
+
+function removeArtwork(artId) {
+  const piece = state.artworks.find((item) => item.id === artId);
+  if (!piece) return;
+  state.artworks = state.artworks.filter((item) => item.id !== artId);
+  persistArtworks();
+  logActivity("Deleted artwork “" + piece.title + "”", "🖼");
+  renderArt();
+  if (elements.artViewerDialog.open) elements.artViewerDialog.close();
+  showToast(piece.title + " deleted");
+}
+
+function toggleArtworkArchive() {
+  const piece = state.artworks.find((item) => item.id === state.activeArtId);
+  if (!piece) return;
+  piece.archived = !piece.archived;
+  persistArtworks();
+  logActivity((piece.archived ? "Archived " : "Restored ") + "artwork “" + piece.title + "”", "🖼");
+  elements.artViewerDialog.close();
+  renderArt();
+  showToast(piece.archived ? "Artwork moved to the archive" : "Artwork restored to the show");
+}
+
 function openChoreForm() {
   if (!PROFILES[state.profile].adult) return;
   $("#choreForm").reset();
@@ -802,6 +1187,7 @@ function openChoreForm() {
   $("#choreDueTimeInput").value = "18:00";
   $("#chorePointsInput").value = "10";
   $("#chorePhotoRequiredInput").checked = true;
+  $("#choreRepeatInput").value = "none";
   elements.choreFormDialog.showModal();
   setTimeout(() => $("#choreTitleInput").focus(), 0);
 }
@@ -872,6 +1258,7 @@ function finishRewardClaim() {
   active.step = 3;
   persistRewards();
   persistClaims();
+  logActivity(PROFILES[active.owner].name + " claimed “" + item.name + "” for " + item.cost + " points", "★");
   renderAll();
   renderRewardClaim();
   showToast(item.name + " claimed · " + item.cost + " points used");
@@ -879,13 +1266,18 @@ function finishRewardClaim() {
 
 function openEventDialog(prefill) {
   prefill = prefill || {};
+  const existing = prefill.eventId ? state.events.find((item) => item.id === prefill.eventId) : null;
+  const values = existing || prefill;
   $("#calendarEventForm").reset();
-  $("#eventNameInput").value = prefill.title || "";
-  $("#eventPeopleInput").value = prefill.people || (state.profile === "family" ? "family" : state.profile);
-  $("#eventLocationInput").value = prefill.location || "";
-  $("#eventDateInput").value = prefill.date || state.selectedCalendarDate || datePlus(0);
-  $("#eventTimeInput").value = prefill.time || "18:00";
-  $("#calendarEventTitle").textContent = prefill.title ? "Schedule a reward" : "Add an event";
+  $("#eventNameInput").value = values.title || "";
+  $("#eventPeopleInput").value = values.people || (state.profile === "family" ? "family" : state.profile);
+  $("#eventLocationInput").value = values.location || "";
+  $("#eventDateInput").value = values.date || state.selectedCalendarDate || datePlus(0);
+  $("#eventTimeInput").value = values.time || "18:00";
+  $("#calendarEventTitle").textContent = existing ? "Edit event" : prefill.claimId ? "Schedule a reward" : "Add an event";
+  $("#saveEventButton").textContent = existing ? "Save changes" : "Add to calendar";
+  $("#deleteEventButton").hidden = !existing;
+  state.editingEventId = existing ? existing.id : null;
   state.schedulingClaimId = prefill.claimId || null;
   elements.calendarEventDialog.showModal();
   setTimeout(() => $("#eventNameInput").focus(), 0);
@@ -902,6 +1294,7 @@ function acknowledgeClaim(claimId) {
   if (!claim) return;
   claim.acknowledged = true;
   persistClaims();
+  logActivity("Acknowledged " + PROFILES[claim.childId].name + "’s reward claim", "★");
   renderAll();
   showToast("Reward claim acknowledged");
 }
@@ -946,9 +1339,11 @@ async function addArtwork(file) {
 function openArtViewer(artId) {
   const piece = state.artworks.find((item) => item.id === artId);
   if (!piece) return;
+  state.activeArtId = artId;
   $("#artViewerStage").innerHTML = piece.type === "image" ? '<img src="' + piece.data + '" alt="' + escapeHtml(piece.title) + '">' : '<div class="viewer-css-art ' + piece.className + '"><span>' + escapeHtml(piece.content).replace(/\n/g, "<br>") + "</span></div>";
   $("#artViewerTitle").textContent = piece.title;
   $("#artViewerArtist").textContent = "By " + piece.artist;
+  $("#archiveArtworkButton").textContent = piece.archived ? "Restore to showcase" : "Archive piece";
   elements.artViewerDialog.showModal();
 }
 
@@ -1140,6 +1535,16 @@ $("#passcodeForm").addEventListener("submit", async (event) => {
   if (context.action === "switch") selectProfile(parentId);
   if (context.action === "approve") await approveChore(parentId);
   if (context.action === "redo") await requestNewPhotos(parentId);
+  if (context.action === "deleteChore") await removeChore(context.choreId, parentId);
+  if (context.action === "deleteItem") {
+    if (context.itemType === "chore") await removeChore(context.itemId, parentId);
+    if (context.itemType === "habit") removeHabit(context.itemId, parentId);
+    if (context.itemType === "list") removeListItem(context.itemId, parentId);
+    if (context.itemType === "event") removeCalendarEvent(context.itemId, parentId);
+  }
+  if (context.action === "vacation") toggleVacationMode(parentId);
+  if (context.action === "activity") openActivity();
+  if (context.action === "backup") openBackup();
 });
 
 $("#manageRewardsButton").addEventListener("click", () => openRewardManager(state.rewardOwner));
@@ -1156,6 +1561,10 @@ $("#rewardOverview").addEventListener("click", (event) => {
     openRewardManager(manage.dataset.manageReward);
     return;
   }
+  const reward = event.target.closest("[data-claim-reward]");
+  if (reward) openRewardClaim(reward.dataset.claimOwner, reward.dataset.claimReward);
+});
+$("#homeRewardChoices").addEventListener("click", (event) => {
   const reward = event.target.closest("[data-claim-reward]");
   if (reward) openRewardClaim(reward.dataset.claimOwner, reward.dataset.claimReward);
 });
@@ -1218,6 +1627,11 @@ $("#claimNoticePanel").addEventListener("click", (event) => {
 });
 
 function handleChoreListClick(event) {
+  const remove = event.target.closest("[data-delete-chore]");
+  if (remove) {
+    openDeleteConfirm("chore", remove.dataset.deleteChore);
+    return;
+  }
   const action = event.target.closest(".chore-action");
   if (action) {
     openPhotoDialog(action.closest(".chore-item"));
@@ -1286,6 +1700,7 @@ $("#choreForm").addEventListener("submit", (event) => {
     initialStatus: "ready",
     dueDate: $("#choreDueDateInput").value,
     dueTime: $("#choreDueTimeInput").value,
+    repeat: $("#choreRepeatInput").value,
     photoRequired: $("#chorePhotoRequiredInput").checked || points > 0 && (assignee === "harper" || assignee === "griffin"),
     familyPriority: true,
     createdBy: state.profile,
@@ -1299,6 +1714,27 @@ $("#choreForm").addEventListener("submit", (event) => {
   elements.choreFormDialog.close();
   renderAll();
   showToast(chore.title + " assigned to " + PROFILES[assignee].name);
+});
+
+$("#closeDeleteConfirm").addEventListener("click", () => elements.deleteConfirmDialog.close());
+$("#cancelDeleteConfirm").addEventListener("click", () => elements.deleteConfirmDialog.close());
+$("#confirmDeleteButton").addEventListener("click", async () => {
+  const pending = state.pendingDelete;
+  if (!pending) return;
+  elements.deleteConfirmDialog.close();
+  state.pendingDelete = null;
+  if (pending.type === "art") {
+    removeArtwork(pending.id);
+    return;
+  }
+  if (!PROFILES[state.profile].adult) {
+    requestParentAuth({ action: "deleteItem", itemType: pending.type, itemId: pending.id });
+    return;
+  }
+  if (pending.type === "chore") await removeChore(pending.id, state.profile);
+  if (pending.type === "habit") removeHabit(pending.id, state.profile);
+  if (pending.type === "list") removeListItem(pending.id, state.profile);
+  if (pending.type === "event") removeCalendarEvent(pending.id, state.profile);
 });
 
 $("#customizeLayoutButton").addEventListener("click", openLayoutEditor);
@@ -1344,11 +1780,20 @@ $("#weekStrip").addEventListener("click", (event) => {
   state.selectedCalendarDate = button.dataset.calendarDate;
   renderCalendar();
 });
+$("#calendarAgenda").addEventListener("click", (event) => {
+  const row = event.target.closest("[data-event-id]");
+  if (row) openEventDialog({ eventId: row.dataset.eventId });
+});
+$("#deleteEventButton").addEventListener("click", () => {
+  const eventId = state.editingEventId;
+  elements.calendarEventDialog.close();
+  if (eventId) openDeleteConfirm("event", eventId);
+});
 $("#calendarEventForm").addEventListener("submit", (event) => {
   if (!event.submitter || event.submitter.value !== "save") return;
   event.preventDefault();
-  const newEvent = {
-    id: makeId("event"),
+  const calendarEvent = {
+    id: state.editingEventId || makeId("event"),
     title: $("#eventNameInput").value.trim(),
     people: $("#eventPeopleInput").value,
     location: $("#eventLocationInput").value.trim(),
@@ -1357,23 +1802,104 @@ $("#calendarEventForm").addEventListener("submit", (event) => {
     source: state.schedulingClaimId ? "reward" : "local",
     createdBy: state.profile,
   };
-  if (!newEvent.title || !newEvent.date || !newEvent.time) {
+  if (!calendarEvent.title || !calendarEvent.date || !calendarEvent.time) {
     showToast("Add an event name, date, and time");
     return;
   }
-  state.events.push(newEvent);
+  const existingIndex = state.events.findIndex((item) => item.id === state.editingEventId);
+  if (existingIndex >= 0) {
+    calendarEvent.source = state.events[existingIndex].source;
+    calendarEvent.createdBy = state.events[existingIndex].createdBy;
+    state.events[existingIndex] = calendarEvent;
+    logActivity("Updated calendar event “" + calendarEvent.title + "”", "📅");
+  } else {
+    state.events.push(calendarEvent);
+    logActivity("Added calendar event “" + calendarEvent.title + "”", "📅");
+  }
   if (state.schedulingClaimId) {
     const claim = state.rewardClaims.find((item) => item.id === state.schedulingClaimId);
-    if (claim) claim.scheduledEventId = newEvent.id;
+    if (claim) claim.scheduledEventId = calendarEvent.id;
     persistClaims();
   }
-  state.selectedCalendarDate = newEvent.date;
+  state.selectedCalendarDate = calendarEvent.date;
   state.schedulingClaimId = null;
+  state.editingEventId = null;
   persistEvents();
   elements.calendarEventDialog.close();
   renderAll();
   navigateTo("calendar", { quiet: true });
-  showToast("Added to the family calendar");
+  showToast(existingIndex >= 0 ? "Calendar event updated" : "Added to the family calendar");
+});
+
+function openHabitDialog() {
+  $("#habitForm").reset();
+  const isKid = state.profile === "harper" || state.profile === "griffin";
+  $("#habitPersonInput").value = isKid ? state.profile : state.profile === "family" ? "harper" : state.profile;
+  $("#habitPersonInput").disabled = isKid;
+  $("#habitTimeInput").value = "19:00";
+  elements.habitDialog.showModal();
+  setTimeout(() => $("#habitNameInput").focus(), 0);
+}
+
+$("#addHabitButton").addEventListener("click", openHabitDialog);
+$("#habitForm").addEventListener("submit", (event) => {
+  if (!event.submitter || event.submitter.value !== "save") return;
+  event.preventDefault();
+  const name = $("#habitNameInput").value.trim();
+  if (!name) return;
+  const habit = { id: makeId("habit"), person: $("#habitPersonInput").value, name: name, icon: $("#habitIconInput").value, schedule: $("#habitScheduleInput").value, time: $("#habitTimeInput").value };
+  state.habits.push(habit);
+  persistHabits();
+  logActivity("Added habit “" + habit.name + "” for " + PROFILES[habit.person].name, habit.icon);
+  elements.habitDialog.close();
+  renderHabits();
+  showToast("New habit added for " + PROFILES[habit.person].name);
+});
+
+function handleHabitClick(event) {
+  const remove = event.target.closest("[data-delete-habit]");
+  if (remove) return openDeleteConfirm("habit", remove.dataset.deleteHabit);
+  const toggle = event.target.closest("[data-toggle-habit]");
+  if (toggle) toggleHabit(toggle.dataset.toggleHabit);
+}
+$("#homeHabitList").addEventListener("click", handleHabitClick);
+$("#habitBoard").addEventListener("click", handleHabitClick);
+$("#habitFilters").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-habit-filter]");
+  if (!button) return;
+  state.habitFilter = button.dataset.habitFilter;
+  renderHabits();
+});
+
+$("#homeListForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addListItem($("#homeListInput").value, "groceries");
+  event.currentTarget.reset();
+});
+$("#fullListForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  addListItem($("#fullListInput").value, $("#listCategoryInput").value);
+  event.currentTarget.reset();
+});
+function handleListClick(event) {
+  const remove = event.target.closest("[data-delete-list]");
+  if (remove) return openDeleteConfirm("list", remove.dataset.deleteList);
+  const toggle = event.target.closest("[data-toggle-list]");
+  if (toggle) toggleListItem(toggle.dataset.toggleList);
+}
+$("#homeListItems").addEventListener("click", handleListClick);
+$("#sharedList").addEventListener("click", handleListClick);
+$("#listFilters").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-list-filter]");
+  if (!button) return;
+  state.listFilter = button.dataset.listFilter;
+  renderLists();
+});
+$("#saveFamilyNoteButton").addEventListener("click", () => {
+  state.familyNote = $("#familyNoteInput").value.trim();
+  localStorage.setItem("hh-family-note", state.familyNote);
+  logActivity("Updated the pinned family note", "📌");
+  showToast("Family note saved");
 });
 
 document.addEventListener("change", (event) => {
@@ -1391,6 +1917,16 @@ function handleArtClick(event) {
 $("#artWall").addEventListener("click", handleArtClick);
 $("#fullArtWall").addEventListener("click", handleArtClick);
 $("#closeArtViewer").addEventListener("click", () => elements.artViewerDialog.close());
+$("#archiveArtworkButton").addEventListener("click", toggleArtworkArchive);
+$("#deleteArtworkButton").addEventListener("click", () => {
+  const artId = state.activeArtId;
+  elements.artViewerDialog.close();
+  if (artId) openDeleteConfirm("art", artId);
+});
+$("#showArchiveButton").addEventListener("click", () => {
+  state.showArchivedArt = !state.showArchivedArt;
+  renderArt();
+});
 $("#openPaintButton").addEventListener("click", openPainter);
 $("#closePaintButton").addEventListener("click", () => elements.paintDialog.close());
 $("#paintColors").addEventListener("click", (event) => {
@@ -1430,6 +1966,28 @@ $("#timerReset").addEventListener("click", () => {
 
 $("#sleepButton").addEventListener("click", enterCalmMode);
 $("#wakeButton").addEventListener("click", leaveCalmMode);
+$("#vacationModeButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) toggleVacationMode(state.profile);
+  else requestParentAuth({ action: "vacation" });
+});
+$("#activityButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) openActivity();
+  else requestParentAuth({ action: "activity" });
+});
+$("#backupButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) openBackup();
+  else requestParentAuth({ action: "backup" });
+});
+$("#closeActivityButton").addEventListener("click", () => elements.activityDialog.close());
+$("#closeBackupButton").addEventListener("click", () => elements.backupDialog.close());
+$("#downloadBackupButton").addEventListener("click", downloadBackup);
+$("#restoreBackupInput").addEventListener("change", (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (file) restoreBackup(file);
+  event.target.value = "";
+});
+window.addEventListener("online", renderConnection);
+window.addEventListener("offline", renderConnection);
 setInterval(updateClock, 30000);
 setInterval(updateIdleCountdown, 1000);
 ["pointerdown", "keydown", "touchstart"].forEach((eventName) => document.addEventListener(eventName, resetIdleDeadline, { passive: true }));
@@ -1441,7 +1999,7 @@ document.addEventListener("click", (event) => {
     navigateTo(nav.dataset.view);
   }
 });
-$$(".settings-tile:not(#settingsLayoutButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
+$$(".settings-tile:not(#settingsLayoutButton):not(#vacationModeButton):not(#activityButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
 

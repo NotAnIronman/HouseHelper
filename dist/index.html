@@ -24,6 +24,8 @@
       <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></symbol>
       <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></symbol>
       <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.2a1.8 1.8 0 0 0 1.2-3.2 1.8 1.8 0 0 1 1.2-3.2H18A3 3 0 0 0 21 12a9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="15" cy="8" r="1"/></symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+      <symbol id="icon-habit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.6L16.5 9"/></symbol>
       <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
     </svg>
 
@@ -34,7 +36,7 @@
           <span>House<span>Helper</span></span>
         </a>
         <div class="topbar-actions">
-          <div class="connection-pill" aria-label="Connection status"><span></span> This device</div>
+          <div class="connection-pill" id="connectionStatus" aria-label="Connection status"><span></span><b id="connectionLabel">Online</b></div>
           <button class="icon-button" id="sleepButton" type="button" aria-label="Enter calm mode">
             <svg><use href="#icon-moon"></use></svg>
           </button>
@@ -51,6 +53,8 @@
         <button class="nav-item" data-view="chores" type="button"><svg><use href="#icon-check"></use></svg><span>Chores</span></button>
         <button class="nav-item" data-view="rewards" type="button"><svg><use href="#icon-star"></use></svg><span>Rewards</span></button>
         <button class="nav-item" data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Calendar</span></button>
+        <button class="nav-item" data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
+        <button class="nav-item" data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
         <button class="nav-item" data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art show</span></button>
         <button class="nav-item nav-settings" data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
       </aside>
@@ -75,8 +79,8 @@
             <div class="profile-motif" aria-hidden="true">✿ ✦ ✿</div>
             <div class="card-header">
               <div>
-                <p class="eyebrow">Reward radar</p>
-                <h2 id="rewardTitle">Harper is closing in</h2>
+                <p class="eyebrow">Save & spend</p>
+                <h2 id="rewardTitle">Harper’s reward shop</h2>
               </div>
               <div class="reward-controls adult-only">
                 <div class="reward-kid-tabs" aria-label="Choose kid reward account">
@@ -86,25 +90,9 @@
                 <button class="secondary-button" id="manageRewardsButton" type="button">Manage</button>
               </div>
             </div>
-            <div class="reward-main">
-              <div class="progress-orbit" id="progressOrbit" style="--progress: 67%">
-                <div class="orbit-center"><strong id="pointCount">80</strong><span>of <span id="targetCount">120</span></span></div>
-              </div>
-              <div class="reward-details">
-                <div class="reward-next">
-                  <span class="reward-emoji" aria-hidden="true">🍦</span>
-                  <div><small>Next reward</small><strong id="rewardName">Ice cream trip</strong></div>
-                  <span class="points-left" id="pointsLeft">40 to go</span>
-                </div>
-                <div class="progress-track" aria-label="Reward progress"><span id="progressBar" style="width:67%"></span></div>
-                <p class="encouragement" id="encouragement"><strong>Two more chores</strong> could unlock it this week.</p>
-                <div class="milestones" aria-label="Reward milestones">
-                  <div class="milestone reached"><span>✓</span><strong>50</strong><small>Extra screen time</small></div>
-                  <div class="milestone current"><span>🍦</span><strong>120</strong><small>Ice cream trip</small></div>
-                  <div class="milestone"><span>🎬</span><strong>200</strong><small>Pick movie night</small></div>
-                </div>
-              </div>
-            </div>
+            <div class="reward-shop-balance"><span class="reward-wallet">★</span><span><strong><span id="pointCount">80</span> points</strong><small>Saved points never expire</small></span></div>
+            <div class="home-reward-shop" id="homeRewardChoices" aria-label="Reward shop choices"></div>
+            <p class="reward-shop-note" id="encouragement">Points only change when a reward is purchased.</p>
           </section>
 
           <section class="card chores-card" id="chores" data-widget="chores" aria-labelledby="choresTitle">
@@ -120,6 +108,19 @@
             <div class="card-header compact"><div><p class="eyebrow">Needs attention</p><h2 id="attentionTitle">Household reminders</h2></div><span class="attention-count" id="attentionCount">2</span></div>
             <div class="attention-list" id="homeAttentionList"></div>
             <button class="text-button" data-view="chores" type="button">Review all chores <span>›</span></button>
+          </section>
+
+          <section class="card habits-card" data-widget="habits" aria-labelledby="habitsWidgetTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Daily rhythm</p><h2 id="habitsWidgetTitle">Habits</h2></div><span class="habit-summary" id="habitSummary">0 / 0</span></div>
+            <div class="home-habit-list" id="homeHabitList"></div>
+            <button class="text-button" data-view="habits" type="button">Open routines <span>›</span></button>
+          </section>
+
+          <section class="card lists-card" data-widget="lists" aria-labelledby="listsWidgetTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Kitchen list</p><h2 id="listsWidgetTitle">Shared list</h2></div><span class="list-count" id="listCount">0 left</span></div>
+            <form class="quick-list-form" id="homeListForm"><input id="homeListInput" maxlength="60" placeholder="Add milk, batteries, permission slip…" aria-label="Add an item to the shared list" required /><button type="submit" aria-label="Add list item">+</button></form>
+            <div class="home-list-items" id="homeListItems"></div>
+            <button class="text-button" data-view="lists" type="button">Open family list <span>›</span></button>
           </section>
 
           <section class="card schedule-card" id="calendar" data-widget="calendar" aria-labelledby="scheduleTitle">
@@ -161,7 +162,7 @@
         </section>
 
         <section class="app-view full-app-view" id="rewardsView" data-app-view="rewards" hidden>
-          <header class="view-header"><div><p class="eyebrow">Kid motivation</p><h1>Rewards</h1><p>Celebrate progress, review balances, and keep the next goal within reach.</p></div></header>
+          <header class="view-header"><div><p class="eyebrow">Save and spend</p><h1>Reward shop</h1><p>Points stay in each child’s wallet until they choose to spend them.</p></div></header>
           <div class="claim-notice-panel" id="claimNoticePanel" hidden></div>
           <div class="reward-overview" id="rewardOverview"></div>
         </section>
@@ -172,8 +173,23 @@
           <div class="calendar-agenda" id="calendarAgenda"></div>
         </section>
 
+        <section class="app-view full-app-view" id="habitsView" data-app-view="habits" hidden>
+          <header class="view-header"><div><p class="eyebrow">Healthy family rhythms</p><h1>Habits & routines</h1><p>Small daily wins, visible streaks, and gentle resets when life gets busy.</p></div><button class="primary-button" id="addHabitButton" type="button">+ Add habit</button></header>
+          <div class="vacation-banner" id="vacationBanner" hidden><span>☀</span><div><strong>Vacation mode is on</strong><small>Repeating chores are paused. Habits can still be checked voluntarily.</small></div></div>
+          <div class="filter-row" id="habitFilters" aria-label="Filter habits by person"><button class="active" data-habit-filter="all" type="button">Everyone</button><button data-habit-filter="tyler" type="button">Tyler</button><button data-habit-filter="rose" type="button">Rose</button><button data-habit-filter="harper" type="button">Harper</button><button data-habit-filter="griffin" type="button">Griffin</button></div>
+          <div class="habit-board" id="habitBoard"></div>
+        </section>
+
+        <section class="app-view full-app-view" id="listsView" data-app-view="lists" hidden>
+          <header class="view-header"><div><p class="eyebrow">Shared household memory</p><h1>Family list</h1><p>Groceries, school needs, household supplies, and ideas anyone can capture.</p></div></header>
+          <section class="bulletin-card"><div><p class="eyebrow">Pinned family note</p><h2>What everyone should know</h2></div><textarea id="familyNoteInput" maxlength="280" placeholder="Dinner is at 6:30. Harper needs her blue folder tomorrow."></textarea><button class="primary-button" id="saveFamilyNoteButton" type="button">Save note</button></section>
+          <form class="list-composer" id="fullListForm"><input id="fullListInput" maxlength="60" placeholder="What should we remember?" required /><select id="listCategoryInput" aria-label="List category"><option value="groceries">Groceries</option><option value="household">Household</option><option value="school">School</option><option value="ideas">Ideas</option></select><button class="primary-button" type="submit">Add item</button></form>
+          <div class="filter-row" id="listFilters" aria-label="Filter shared list"><button class="active" data-list-filter="all" type="button">Everything</button><button data-list-filter="groceries" type="button">Groceries</button><button data-list-filter="household" type="button">Household</button><button data-list-filter="school" type="button">School</button><button data-list-filter="ideas" type="button">Ideas</button><button data-list-filter="done" type="button">Completed</button></div>
+          <div class="shared-list" id="sharedList"></div>
+        </section>
+
         <section class="app-view full-app-view" id="artView" data-app-view="art" hidden>
-          <header class="view-header"><div><p class="eyebrow">Made by the family</p><h1>Art show</h1><p>Tap any piece for the full-screen view, or make something new together.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="openPaintButton" type="button">🎨 Finger paint</button><label class="primary-upload"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg>Add artwork</label></div></header>
+          <header class="view-header"><div><p class="eyebrow">Made by the family</p><h1>Art show</h1><p>Tap any piece for the full-screen view, or make something new together.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="showArchiveButton" type="button">View archive</button><button class="secondary-dark-button" id="openPaintButton" type="button">🎨 Finger paint</button><label class="primary-upload"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg>Add artwork</label></div></header>
           <div class="gallery-grid" id="fullArtWall"></div>
         </section>
 
@@ -183,6 +199,9 @@
             <button class="settings-tile" id="settingsLayoutButton" type="button"><span class="settings-icon"><svg><use href="#icon-settings"></use></svg></span><span><strong>Home layout</strong><small>Resize, reorder, or hide widgets</small></span><b>›</b></button>
             <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-star"></use></svg></span><span><strong>Profile themes</strong><small>Colors, type, icon size, and priorities</small></span><b>›</b></button>
             <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-moon"></use></svg></span><span><strong>Sleep & wake</strong><small>Calm mode currently begins at 9:00 PM</small></span><b>›</b></button>
+            <button class="settings-tile" id="vacationModeButton" type="button"><span class="settings-icon">☀</span><span><strong>Vacation mode</strong><small id="vacationModeLabel">Repeating chores are running normally</small></span><b>›</b></button>
+            <button class="settings-tile" id="activityButton" type="button"><span class="settings-icon"><svg><use href="#icon-list"></use></svg></span><span><strong>Household activity</strong><small>Approvals, rewards, schedules, and changes</small></span><b>›</b></button>
+            <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Backup & restore</strong><small>Download or import this device’s family data</small></span><b>›</b></button>
           </div>
         </section>
       </main>
@@ -192,6 +211,8 @@
         <button data-view="chores" type="button"><svg><use href="#icon-camera"></use></svg><span>Chores</span></button>
         <button data-view="rewards" type="button"><svg><use href="#icon-star"></use></svg><span>Rewards</span></button>
         <button data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Schedule</span></button>
+        <button data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
+        <button data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
         <button data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art</span></button>
         <button data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
       </nav>
@@ -264,6 +285,7 @@
           <label class="field"><span>Points</span><input id="chorePointsInput" type="number" min="0" max="500" value="10" inputmode="numeric" required /></label>
           <label class="field"><span>Due date</span><input id="choreDueDateInput" type="date" required /></label>
           <label class="field"><span>Due time</span><input id="choreDueTimeInput" type="time" value="18:00" required /></label>
+          <label class="field field-wide"><span>Repeats</span><select id="choreRepeatInput"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week on this day</option></select></label>
           <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until a parent reviews the evidence.</small></span></label>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add chore</button></div>
@@ -320,8 +342,31 @@
           <label class="field"><span>Time</span><input id="eventTimeInput" type="time" required /></label>
           <p class="trust-note field-wide">Everyone—including Harper and Griffin—can add family calendar items. Connected calendars will appear beside these dashboard-created events.</p>
         </div>
-        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add to calendar</button></div>
+        <div class="dialog-footer split-footer"><button class="danger-button" id="deleteEventButton" type="button" hidden>Delete event</button><span></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveEventButton" value="save" type="submit">Add to calendar</button></div>
       </form>
+    </dialog>
+
+    <dialog id="habitDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="habitForm">
+        <div class="dialog-header"><div><p class="eyebrow">Build a routine</p><h2>Add a family habit</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid">
+          <label class="field field-wide"><span>Habit</span><input id="habitNameInput" maxlength="60" placeholder="Brush teeth" required /></label>
+          <label class="field"><span>For</span><select id="habitPersonInput" required><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <label class="field"><span>Icon</span><select id="habitIconInput"><option value="🪥">🪥 Teeth</option><option value="📚">📚 Reading</option><option value="💧">💧 Water</option><option value="💊">💊 Medicine</option><option value="🧘">🧘 Mindfulness</option><option value="🏃">🏃 Movement</option><option value="✨">✨ Other</option></select></label>
+          <label class="field"><span>Schedule</span><select id="habitScheduleInput"><option value="daily">Every day</option><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option></select></label>
+          <label class="field"><span>Best time</span><input id="habitTimeInput" type="time" value="19:30" required /></label>
+          <p class="trust-note field-wide">Kids can create and check their own habits. Parents can create routines for anyone.</p>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add habit</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="activityDialog" class="app-dialog activity-dialog">
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Household history</p><h2>Recent activity</h2></div><button class="close-button" id="closeActivityButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="activity-list" id="activityList"></div></div></div>
+    </dialog>
+
+    <dialog id="backupDialog" class="app-dialog">
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local data safety</p><h2>Backup & restore</h2></div><button class="close-button" id="closeBackupButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><p class="backup-copy">Download the dashboard data stored by this browser, or restore a previous HouseHelper backup. Chore photos stored in the browser’s photo database are not included yet.</p><div class="backup-actions"><button class="primary-button" id="downloadBackupButton" type="button">Download backup</button><label class="secondary-dark-button backup-upload">Restore backup<input id="restoreBackupInput" type="file" accept="application/json,.json" /></label></div></div></div>
     </dialog>
 
     <dialog id="artViewerDialog" class="art-viewer-dialog">
@@ -329,6 +374,7 @@
         <button class="art-viewer-close" id="closeArtViewer" type="button" aria-label="Close full-screen artwork">×</button>
         <div class="art-viewer-stage" id="artViewerStage"></div>
         <div class="art-viewer-caption"><strong id="artViewerTitle">Family artwork</strong><span id="artViewerArtist"></span></div>
+        <div class="art-viewer-actions"><button class="secondary-dark-button" id="archiveArtworkButton" type="button">Archive piece</button><button class="danger-button adult-only" id="deleteArtworkButton" type="button">Delete permanently</button></div>
       </div>
     </dialog>
 
@@ -340,6 +386,14 @@
           <div class="paint-actions"><button class="secondary-dark-button" id="paintEraser" type="button">Eraser</button><button class="secondary-dark-button" id="clearPaint" type="button">Clear</button><button class="primary-button" id="savePainting" type="button">Save to art show</button></div>
         </div>
         <div class="paint-canvas-wrap"><canvas id="paintCanvas" width="1200" height="720" aria-label="Finger painting canvas"></canvas></div>
+      </div>
+    </dialog>
+
+    <dialog id="deleteConfirmDialog" class="app-dialog">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow">Please confirm</p><h2 id="deleteConfirmTitle">Remove this item?</h2></div><button class="close-button" id="closeDeleteConfirm" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-body"><p class="delete-confirm-copy" id="deleteConfirmCopy"></p></div>
+        <div class="dialog-footer"><button class="secondary-button" id="cancelDeleteConfirm" type="button">Keep it</button><button class="danger-button" id="confirmDeleteButton" type="button">Remove</button></div>
       </div>
     </dialog>
 

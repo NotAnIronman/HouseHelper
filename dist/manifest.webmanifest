@@ -1,13 +1,18 @@
 {
   "name": "HouseHelper Family Dashboard",
   "short_name": "HouseHelper",
-  "description": "Chores, rewards, schedules, timers, and family moments in one place.",
+  "description": "Chores, routines, rewards, schedules, shared lists, timers, and family moments in one place.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f2f4ef",
   "theme_color": "#14392f",
+  "shortcuts": [
+    { "name": "Chores", "short_name": "Chores", "url": "./#chores", "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Family list", "short_name": "List", "url": "./#lists", "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Calendar", "short_name": "Calendar", "url": "./#calendar", "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+  ],
   "icons": [
     { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
