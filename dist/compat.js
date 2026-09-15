@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
 
-  const VERSION = "0.3.0";
+  const VERSION = "0.5.0";
 
   function sha256Hex(bytes) {
     const constants = new Uint32Array([

@@ -7,9 +7,22 @@ import vm from "node:vm";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 await import(new URL("../dist/compat.js", import.meta.url));
+await import(new URL("../dist/languages.js", import.meta.url));
+await import(new URL("../dist/language-german-b1.js", import.meta.url));
+await import(new URL("../dist/language-korean-b1.js", import.meta.url));
+await import(new URL("../dist/language-world.js", import.meta.url));
 const compat = globalThis.HouseHelperCompat;
+const languagePacks = globalThis.HouseHelperLanguagePacks.packs;
 
-assert.equal(compat.VERSION, "0.3.0");
+assert.equal(compat.VERSION, "0.5.0");
+assert.ok(languagePacks.some((pack) => pack.id === "german" && pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "German must ship with a B1-preparation path");
+assert.ok(languagePacks.some((pack) => pack.id === "korean" && pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "Korean must ship with a B1-preparation path");
+assert.deepEqual(languagePacks.map((pack) => pack.id), ["german", "korean", "spanish", "french", "japanese", "italian", "mandarin"], "the complete offline course catalog must load in a stable order");
+const languageCards = languagePacks.flatMap((pack) => pack.modules.flatMap((module) => module.cards));
+assert.equal(languageCards.length, 1400, "offline language library must retain its full curriculum");
+assert.equal(new Set(languageCards.map((card) => card.id)).size, languageCards.length, "language card IDs must be globally unique");
+assert.ok(languagePacks.every((pack) => Array.isArray(pack.levels) && pack.levels.length && pack.modules.every((module) => pack.levels.includes(module.level))), "every language module must have a supported course level");
+assert.ok(languageCards.every((card) => card.level && card.kind && card.prompt && card.answer), "every language card must include level, type, prompt, and answer metadata");
 for (const [person, code] of [["adult-a", "1234"], ["caregiver-b", "0000"], ["adult-a", "9876"]]) {
   const source = `HouseHelper:${person}:${code}:local-parent`;
   const expected = createHash("sha256").update(source).digest("hex");
@@ -37,15 +50,29 @@ assert.match(html, /id="familySetupDialog"/);
 assert.match(html, /id="adultMemberEditors"/);
 assert.match(html, /id="childMemberEditors"/);
 assert.match(html, /data-app-view="fun"/);
-assert.match(html, /compat\.js\?v=0\.3\.0/);
-assert.match(worker, /compat\.js\?v=0\.3\.0/);
+assert.match(html, /data-app-view="learning"/);
+assert.match(html, /id="languageSessionDialog"/);
+assert.match(html, /languages\.js\?v=0\.5\.0/);
+assert.match(html, /language-german-b1\.js\?v=0\.5\.0/);
+assert.match(html, /language-korean-b1\.js\?v=0\.5\.0/);
+assert.match(html, /language-world\.js\?v=0\.5\.0/);
+assert.match(worker, /languages\.js\?v=0\.5\.0/);
+assert.match(worker, /language-german-b1\.js\?v=0\.5\.0/);
+assert.match(worker, /language-korean-b1\.js\?v=0\.5\.0/);
+assert.match(worker, /language-world\.js\?v=0\.5\.0/);
 assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/, "service worker must never cache household API responses");
 assert.match(app, /updateViaCache:\s*"none"/, "service worker updates must bypass stale HTTP caches");
 assert.match(sync, /hs-sync-baseline-v1/, "sync baseline must survive reloads so offline edits can retry");
 assert.match(sync, /markEntriesSynced\(pending\.changes\)/, "local edits must be marked synced only after a successful push");
 assert.match(sync, /familySetupDialog[\s\S]*hh-family-config/, "a new secondary must reload after receiving household setup from its host");
-assert.match(gradle, /versionName = "0\.3\.0"/);
-assert.match(server, /APP_VERSION = "0\.3\.0"/);
+assert.match(sync, /LOCAL_ONLY_KEYS[\s\S]*hh-language-view/, "the learner currently using a screen must stay device-specific");
+assert.match(app, /RETENTION_INTERVALS = \[0, 1, 3, 7, 14, 30, 60\]/, "language reviews must use spaced intervals across different days");
+assert.match(app, /record\.lastReviewDate !== today/, "same-day repetition must not advance a language card more than once");
+assert.match(app, /record\.correctDays\.length >= 5[\s\S]*daysBetween/, "mastery must require recall across at least five days and a multi-week span");
+assert.match(app, /sameKind[\s\S]*sameLevel[\s\S]*ranked/, "quiz distractors must prefer the same card type and course level");
+assert.match(app, /existingLanguageCardProgress/, "viewing the expanded catalog must not create empty progress records");
+assert.match(gradle, /versionName = "0\.5\.0"/);
+assert.match(server, /APP_VERSION = "0\.5\.0"/);
 assert.match(app, /const DEFAULT_CHORES = \[\];/);
 assert.match(app, /const DEFAULT_ARTWORKS = \[\];/);
 assert.match(app, /const DEFAULT_EVENTS = \[\];/);
@@ -98,7 +125,7 @@ const context = {
     const payload = options.method === "POST"
       ? { revision: 1, clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" }
       : { revision: 1, entries: [], clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" };
-    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.3.0" : null }, json: async () => payload };
+    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.5.0" : null }, json: async () => payload };
   },
   localStorage: storage,
   location: { hostname: "192.168.1.2", origin: "http://192.168.1.2:4173", pathname: "/", search: "?pair=test-token", reload() {}, assign() {} },
@@ -120,4 +147,4 @@ assert.equal(context.HouseHelperSync.status.connected, true);
 assert.equal(context.HouseHelperSync.status.deviceName, "Android device", "legacy Linux platform labels must migrate");
 assert.equal(context.HouseHelperSync.status.role, "secondary");
 
-console.log(`HouseHelper self-test passed: ${referencedIds.length} UI references, passcodes, device identity, offline retry, and build versions.`);
+console.log(`HouseHelper self-test passed: ${referencedIds.length} UI references, ${languageCards.length} offline language cards, spaced retention rules, passcodes, device identity, offline retry, and build versions.`);

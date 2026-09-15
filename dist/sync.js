@@ -6,8 +6,8 @@
   const DEVICE_KEY = "hs-device-id";
   const NAME_KEY = "hs-device-name";
   const BASELINE_KEY = "hs-sync-baseline-v1";
-  const CLIENT_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.3.0";
-  const LOCAL_ONLY_KEYS = new Set(["hh-profile", "hh-reminded-events", "hh-reminder-snoozes"]);
+  const CLIENT_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.5.0";
+  const LOCAL_ONLY_KEYS = new Set(["hh-profile", "hh-language-view", "hh-reminded-events", "hh-reminder-snoozes"]);
   const params = new URLSearchParams(location.search);
   const incomingToken = params.get("pair");
   const incomingRole = params.get("role");

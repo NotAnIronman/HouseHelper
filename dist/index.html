@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.3.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.5.0" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -55,8 +55,9 @@
         <button class="nav-item" data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Calendar</span></button>
         <button class="nav-item" data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
         <button class="nav-item" data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
+        <button class="nav-item" data-view="learning" type="button"><span class="nav-emoji">文</span><span>Languages</span></button>
         <button class="nav-item" data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art show</span></button>
-        <button class="nav-item" data-view="fun" type="button"><span class="nav-emoji">✦</span><span>Fun & learn</span></button>
+        <button class="nav-item" data-view="fun" type="button"><span class="nav-emoji">✦</span><span>Games</span></button>
         <button class="nav-item nav-settings" data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
       </aside>
 
@@ -144,6 +145,13 @@
               <label class="add-art"><input id="artUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg><span>Add art</span></label>
             </div>
           </section>
+
+          <section class="card language-widget-card" data-widget="learning" aria-labelledby="languageWidgetTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Friendly family challenge</p><h2 id="languageWidgetTitle">Language league</h2></div><span class="language-mark">文</span></div>
+            <p class="language-widget-summary" id="languageWidgetSummary">Start a course to build the family leaderboard.</p>
+            <div class="league-list compact" id="homeLanguageLeaderboard"></div>
+            <button class="text-button" data-view="learning" type="button">Open language learning <span>›</span></button>
+          </section>
         </div>
         </div>
 
@@ -187,15 +195,29 @@
           <div class="gallery-grid" id="fullArtWall"></div>
         </section>
 
+        <section class="app-view full-app-view" id="learningView" data-app-view="learning" hidden>
+          <header class="view-header learning-view-header"><div><p class="eyebrow">Offline · human-first · no AI</p><h1>Language learning</h1><p>Build useful words and phrases through short lessons, honest recall, and reviews spread across many different days.</p></div><button class="secondary-dark-button adult-only" id="languageSettingsButton" type="button">Learning settings</button></header>
+          <div class="learning-toolbar" aria-label="Language course controls">
+            <label><span>Learner</span><select id="languageLearnerSelect"></select></label>
+            <label><span>Course</span><select id="languagePackSelect"></select></label>
+          </div>
+          <section class="learning-hero">
+            <div class="learning-hero-copy"><p class="eyebrow" id="learningForLabel">Personal course</p><h2 id="learningCourseTitle">Choose a language</h2><span class="learning-catalog-meta" id="learningCatalogMeta">Offline course catalog</span><p>No card can become retained or mastered in one sitting. First attempts count once per day, and cards return on a 1, 3, 7, 14, 30, and 60-day schedule.</p></div>
+            <div class="learning-stat-grid"><div><strong id="learningRetainedCount">0</strong><span>Retained</span></div><div><strong id="learningMasteredCount">0</strong><span>Mastered</span></div><div><strong id="learningDueCount">0</strong><span>Due now</span></div><div><strong id="learningStreakCount">0</strong><span>Day streak</span></div></div>
+          </section>
+          <section class="daily-learning-card">
+            <div><p class="eyebrow">Today’s steady practice</p><h2>Daily learning goal</h2><p id="dailyLearningCopy">Short, spaced reviews build stronger memory than cramming.</p></div>
+            <div class="daily-learning-action"><strong id="dailyLearningProgress">0 / 5 unique reviews</strong><div class="learning-progress-track"><span id="dailyLearningBar"></span></div><button class="primary-button" id="startDailyLearningButton" type="button">Start daily practice</button></div>
+          </section>
+          <div class="learning-content-grid">
+            <section><div class="section-heading"><div><p class="eyebrow">Course path</p><h2 id="learningPathTitle">All levels</h2></div><p>Retain 60% of a module before the next one unlocks.</p></div><div class="language-level-filters" id="languageLevelFilters" aria-label="Course level filter"></div><div class="language-module-grid" id="languageModuleGrid"></div></section>
+            <aside class="language-league-panel"><div class="section-heading"><div><p class="eyebrow">All active learners</p><h2>Family league</h2></div></div><p class="league-explainer">Rankings use retained words—not today’s score—so repetition over time wins over cramming.</p><div class="league-list" id="languageLeaderboard"></div></aside>
+          </div>
+        </section>
+
         <section class="app-view full-app-view" id="funView" data-app-view="fun" hidden>
-          <header class="view-header"><div><p class="eyebrow">Play a little, learn a little</p><h1>Fun & learn</h1><p>Quick activities designed for a shared screen—no ads, accounts, or purchases.</p></div></header>
+          <header class="view-header"><div><p class="eyebrow">A little screen-time fun</p><h1>Family games</h1><p>Quick activities designed for a shared screen—no ads, accounts, or purchases.</p></div></header>
           <div class="fun-grid">
-            <section class="fun-card learning-card">
-              <div class="card-header"><div><p class="eyebrow">Daily language card</p><h2 id="flashcardHeading">Today’s word</h2></div><select id="learningLanguage" aria-label="Learning language"><option value="spanish">Spanish</option><option value="french">French</option><option value="japanese">Japanese</option></select></div>
-              <button class="flashcard" id="flashcard" type="button"><span id="flashcardPrompt">Hello</span><strong id="flashcardAnswer">Tap to reveal</strong><small id="flashcardPronunciation"></small></button>
-              <div class="fun-actions"><button class="secondary-button" id="hearFlashcardButton" type="button">🔊 Hear it</button><button class="primary-button" id="learnedFlashcardButton" type="button">I learned this</button><button class="secondary-button" id="nextFlashcardButton" type="button">Next card</button></div>
-              <p class="learning-progress" id="learningProgress">0 words learned</p>
-            </section>
             <section class="fun-card">
               <p class="eyebrow">Speed game</p><h2>Lightning tap</h2><p>Wait for the tile to turn green, then tap as quickly as you can.</p>
               <button class="reaction-pad" id="reactionPad" type="button"><strong>Start</strong><span id="reactionMessage">Tap to play</span></button>
@@ -219,6 +241,7 @@
             <button class="settings-tile" id="vacationModeButton" type="button"><span class="settings-icon">☀</span><span><strong>Vacation mode</strong><small id="vacationModeLabel">Repeating chores are running normally</small></span><b>›</b></button>
             <button class="settings-tile" id="activityButton" type="button"><span class="settings-icon"><svg><use href="#icon-list"></use></svg></span><span><strong>Household activity</strong><small>Approvals, rewards, schedules, and changes</small></span><b>›</b></button>
             <button class="settings-tile" id="googleCalendarButton" type="button"><span class="settings-icon"><svg><use href="#icon-calendar"></use></svg></span><span><strong>Google Calendar</strong><small id="googleCalendarLabel">Connect shared family schedules</small></span><b>›</b></button>
+            <button class="settings-tile" id="languageSettingsTile" type="button"><span class="settings-icon">文</span><span><strong>Language learning</strong><small id="languageSettingsLabel">Daily goal and reward bonus</small></span><b>›</b></button>
             <button class="settings-tile" id="connectedDevicesButton" type="button"><span class="settings-icon">⌁</span><span><strong>Connected devices</strong><small id="connectedDevicesLabel">Standalone on this device</small></span><b>›</b></button>
             <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Local data & backup</strong><small id="storageTileLabel">Saved privately in this browser</small></span><b>›</b></button>
           </div>
@@ -232,6 +255,7 @@
         <button data-view="calendar" type="button"><svg><use href="#icon-calendar"></use></svg><span>Schedule</span></button>
         <button data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
         <button data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
+        <button data-view="learning" type="button"><span class="nav-emoji">文</span><span>Learn</span></button>
         <button data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art</span></button>
         <button data-view="fun" type="button"><span class="nav-emoji">✦</span><span>Fun</span></button>
         <button data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
@@ -281,7 +305,7 @@
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
           <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.3.0</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.5.0</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -384,6 +408,35 @@
       </form>
     </dialog>
 
+    <dialog id="languageSessionDialog" class="app-dialog language-session-dialog">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow" id="languageSessionEyebrow">Daily practice</p><h2 id="languageSessionTitle">Recall from memory</h2></div><button class="close-button" id="closeLanguageSessionButton" aria-label="Close practice" type="button">×</button></div>
+        <div class="language-session-track"><span id="languageSessionBar"></span></div>
+        <div class="dialog-body language-session-body">
+          <span class="language-session-count" id="languageSessionProgress">1 of 5</span>
+          <div class="language-question-card"><span id="languageQuestionLabel">Choose the answer</span><strong id="languageQuestion">Hello</strong></div>
+          <div class="language-answer-block" id="languageAnswerBlock" hidden><strong id="languageAnswer">Hallo</strong><span id="languagePronunciation"></span><small id="languageNote"></small></div>
+          <div class="language-choices" id="languageChoices"></div>
+          <p class="language-feedback" id="languageFeedback" aria-live="polite"></p>
+        </div>
+        <div class="dialog-footer"><button class="secondary-dark-button" id="hearLanguageButton" type="button">🔊 Hear it</button><span class="dialog-spacer"></span><button class="primary-button" id="languagePracticeButton" type="button">Practice from memory</button><button class="primary-button" id="languageNextButton" type="button" hidden>Next card</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="languageSettingsDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="languageSettingsForm">
+        <div class="dialog-header"><div><p class="eyebrow">Adult learning controls</p><h2>Language goals & rewards</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <p class="integration-help">The goal counts unique cards reviewed that day. Repeating one card never fills the goal or speeds up long-term mastery.</p>
+          <label class="field"><span>Unique cards per daily goal</span><input id="languageDailyGoalInput" type="number" min="1" max="20" value="5" inputmode="numeric" required /></label>
+          <label class="check-field"><input id="languageBonusEnabledInput" type="checkbox" checked /><span><strong>Give children a daily reward bonus</strong><small>Paid once per child per day when their practice goal is completed.</small></span></label>
+          <label class="field"><span>Reward points per completed day</span><input id="languageDailyBonusInput" type="number" min="0" max="50" value="5" inputmode="numeric" required /></label>
+          <div class="retention-rule-card"><strong>Long-term mastery rule</strong><span>Retained requires correct recall on at least 2 different days. Mastered requires at least 5 correct days spanning 14+ days, plus every scheduled review stage.</span></div>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save learning settings</button></div>
+      </form>
+    </dialog>
+
     <dialog id="googleCalendarDialog" class="app-dialog settings-dialog-wide">
       <div class="dialog-panel">
         <div class="dialog-header"><div><p class="eyebrow">Shared schedules</p><h2>Google Calendar</h2></div><button class="close-button" id="closeGoogleCalendarButton" aria-label="Close" type="button">×</button></div>
@@ -472,7 +525,7 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.3.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.5.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
           <div class="pairing-card" id="pairingCard" hidden><span>Pairing address</span><strong id="pairingAddress"></strong><p>Open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi‑Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.</p>
@@ -525,8 +578,12 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.3.0" defer></script>
-    <script src="./app.js?v=0.3.0" defer></script>
-    <script src="./sync.js?v=0.3.0" defer></script>
+    <script src="./compat.js?v=0.5.0" defer></script>
+    <script src="./languages.js?v=0.5.0" defer></script>
+    <script src="./language-german-b1.js?v=0.5.0" defer></script>
+    <script src="./language-korean-b1.js?v=0.5.0" defer></script>
+    <script src="./language-world.js?v=0.5.0" defer></script>
+    <script src="./app.js?v=0.5.0" defer></script>
+    <script src="./sync.js?v=0.5.0" defer></script>
   </body>
 </html>

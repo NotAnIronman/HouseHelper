@@ -3,7 +3,7 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
-const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.3.0";
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.5.0";
 
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -119,7 +119,10 @@ const isChildProfile = (id) => childIds().includes(id);
 const firstAdultId = () => adultIds()[0] || null;
 const firstChildId = () => childIds()[0] || null;
 
-const VIEWS = ["home", "chores", "habits", "lists", "rewards", "calendar", "art", "fun", "settings"];
+const LANGUAGE_PACKS = window.HouseHelperLanguagePacks && Array.isArray(window.HouseHelperLanguagePacks.packs) ? window.HouseHelperLanguagePacks.packs : [];
+const languagePackById = (id) => LANGUAGE_PACKS.find((pack) => pack.id === id) || LANGUAGE_PACKS[0];
+
+const VIEWS = ["home", "chores", "habits", "lists", "rewards", "calendar", "art", "learning", "fun", "settings"];
 const WIDGETS = [
   { id: "rewards", name: "Reward radar", icon: "★", detail: "Kid reward progress" },
   { id: "chores", name: "Today’s chores", icon: "✓", detail: "Assigned work and approvals" },
@@ -129,6 +132,7 @@ const WIDGETS = [
   { id: "calendar", name: "Family schedule", icon: "□", detail: "Upcoming calendar items" },
   { id: "timer", name: "Quick timer", icon: "◷", detail: "Shared live timer" },
   { id: "art", name: "Art show", icon: "✦", detail: "Family gallery" },
+  { id: "learning", name: "Language league", icon: "文", detail: "Long-term learning leaderboard" },
 ];
 
 const BASE_LAYOUT = [
@@ -140,6 +144,7 @@ const BASE_LAYOUT = [
   { id: "calendar", size: "compact", visible: true },
   { id: "timer", size: "compact", visible: true },
   { id: "art", size: "half", visible: true },
+  { id: "learning", size: "half", visible: true },
 ];
 
 const DEFAULT_LAYOUTS = Object.fromEntries(Object.keys(PROFILES).map((id) => [id, clone(BASE_LAYOUT)]));
@@ -204,6 +209,10 @@ const initialGoogleSettings = normalizeSettings(readStoredObject("hh-google-cale
 const initialReminderSettings = normalizeSettings(readStoredObject("hh-reminder-settings"), { enabled: true, leadMinutes: 15 });
 const initialTimerSettings = normalizeSettings(readStoredObject("hh-timer"), { initialSeconds: 15 * 60, remainingSeconds: 15 * 60, running: false, endsAt: 0 });
 const initialTimerRemaining = initialTimerSettings.running && Number(initialTimerSettings.endsAt) ? Math.max(0, Math.ceil((Number(initialTimerSettings.endsAt) - Date.now()) / 1000)) : Math.max(0, Number(initialTimerSettings.remainingSeconds) || 0);
+const storedLearningSettings = readStoredObject("hh-learning-settings");
+const storedLanguageView = readStoredObject("hh-language-view");
+const initialLearningSettings = normalizeSettings(storedLearningSettings, { dailyGoal: 5, bonusEnabled: true, dailyBonus: 5 });
+const initialLearningPack = languagePackById(storedLanguageView.selectedPack || storedLearningSettings.language || storedLearningSettings.selectedPack || "german");
 
 const storedRewards = readStoredObject("hh-rewards");
 const initialProfile = localStorage.getItem("hh-profile");
@@ -275,9 +284,12 @@ const state = {
   paintDrawing: false,
   paintLast: null,
   setupEditing: SETUP_REQUIRED,
-  learningSettings: normalizeSettings(readStoredObject("hh-learning-settings"), { language: "spanish", learned: {}, streakDates: [] }),
-  flashcardOffset: 0,
-  flashcardRevealed: false,
+  languageSettings: initialLearningSettings,
+  languageProgress: readStoredObject("hh-language-progress"),
+  languageProfile: PROFILES[storedLanguageView.selectedLearner] && storedLanguageView.selectedLearner !== "family" ? storedLanguageView.selectedLearner : initialProfile && initialProfile !== "family" && PROFILES[initialProfile] ? initialProfile : familyConfig.members[0].id,
+  languagePack: initialLearningPack ? initialLearningPack.id : "german",
+  languageLevelFilter: ["all", "A1", "A2", "B1"].includes(storedLanguageView.selectedLevel) ? storedLanguageView.selectedLevel : "all",
+  languageSession: null,
   reactionGame: { status: "idle", startedAt: 0, timeoutId: null, best: readStoredNumber("hh-reaction-best", 0) },
   memoryGame: { cards: [], first: null, lock: false, moves: 0, matches: 0 },
 };
@@ -308,6 +320,8 @@ const elements = {
   backupDialog: $("#backupDialog"),
   connectedDevicesDialog: $("#connectedDevicesDialog"),
   familySetupDialog: $("#familySetupDialog"),
+  languageSessionDialog: $("#languageSessionDialog"),
+  languageSettingsDialog: $("#languageSettingsDialog"),
   timerDisplay: $("#timerDisplay"),
   calmScreen: $("#calmScreen"),
   toast: $("#toast"),
@@ -389,6 +403,8 @@ function renderMemberControls() {
   $("#themeProfileInput").innerHTML = ids.map((id) => optionMarkup(id, id === "family" ? familyConfig.familyName + " (family view)" : PROFILES[id].name)).join("");
   $("#googleOwnerInput").innerHTML = allOptions;
   $("#eventPeopleInput").innerHTML = allOptions + (childIds().length > 1 ? optionMarkup("kids", "All children") : "");
+  $("#languageLearnerSelect").innerHTML = memberOptions;
+  $("#languagePackSelect").innerHTML = LANGUAGE_PACKS.map((pack) => optionMarkup(pack.id, pack.flag + " " + pack.name + " · " + pack.nativeName + " · " + allLanguageCards(pack).length + " cards")).join("");
   $("#choreFilters").innerHTML = '<button class="active" data-chore-filter="all" type="button">Everyone</button>' + familyConfig.members.map((member) => '<button data-chore-filter="' + escapeHtml(member.id) + '" type="button">' + escapeHtml(member.name) + '</button>').join("");
   $("#habitFilters").innerHTML = '<button class="active" data-habit-filter="all" type="button">Everyone</button>' + familyConfig.members.map((member) => '<button data-habit-filter="' + escapeHtml(member.id) + '" type="button">' + escapeHtml(member.name) + '</button>').join("");
   $(".reward-kid-tabs").innerHTML = childIds().map((id, index) => '<button class="' + (index === 0 ? "active" : "") + '" data-reward-owner="' + escapeHtml(id) + '" type="button">' + escapeHtml(PROFILES[id].name) + '</button>').join("");
@@ -977,6 +993,7 @@ function renderSettingsSummary() {
   $("#profileThemeLabel").textContent = activeTheme.font === "classic" ? "Storybook type · " + activeTheme.scale + " controls" : (activeTheme.font === "clean" ? "Clean type" : "Rounded type") + " · " + activeTheme.scale + " controls";
   $("#sleepWakeLabel").textContent = state.sleepSettings.enabled ? "Sleeps " + formatTime(state.sleepSettings.sleepTime) + " · wakes " + formatTime(state.sleepSettings.wakeTime) : "Automatic sleep is off";
   $("#googleCalendarLabel").textContent = state.googleSettings.connected ? "Last synced " + (state.googleSettings.lastSync ? new Date(state.googleSettings.lastSync).toLocaleString() : "this session") : "Connect shared family schedules";
+  $("#languageSettingsLabel").textContent = (Number(state.languageSettings.dailyGoal) || 5) + " unique cards daily · " + (state.languageSettings.bonusEnabled && Number(state.languageSettings.dailyBonus) > 0 ? "+" + Number(state.languageSettings.dailyBonus) + " child points" : "reward bonus off");
   renderConnectedDevices();
 }
 
@@ -1495,35 +1512,378 @@ async function restoreBackup(file) {
   }
 }
 
-const FLASHCARD_DECKS = {
-  spanish: { label: "Spanish", voice: "es-ES", cards: [["Hello", "Hola", "OH-lah"], ["Thank you", "Gracias", "GRAH-syahs"], ["Please", "Por favor", "por fah-VOR"], ["Family", "Familia", "fah-MEE-lyah"], ["Good morning", "Buenos días", "BWEH-nohs DEE-ahs"], ["Water", "Agua", "AH-gwah"], ["Friend", "Amigo", "ah-MEE-goh"], ["I love you", "Te quiero", "teh KYEH-roh"]] },
-  french: { label: "French", voice: "fr-FR", cards: [["Hello", "Bonjour", "bohn-ZHOOR"], ["Thank you", "Merci", "mehr-SEE"], ["Please", "S’il vous plaît", "seel voo PLEH"], ["Family", "Famille", "fah-MEE"], ["Good evening", "Bonsoir", "bohn-SWAHR"], ["Water", "Eau", "oh"], ["Friend", "Ami", "ah-MEE"], ["See you soon", "À bientôt", "ah byan-TOH"]] },
-  japanese: { label: "Japanese", voice: "ja-JP", cards: [["Hello", "こんにちは · Konnichiwa", "kohn-nee-chee-wah"], ["Thank you", "ありがとう · Arigatō", "ah-ree-gah-toh"], ["Please", "お願いします · Onegaishimasu", "oh-neh-guy-shee-mahs"], ["Family", "家族 · Kazoku", "kah-zoh-koo"], ["Good morning", "おはよう · Ohayō", "oh-hah-yoh"], ["Water", "水 · Mizu", "mee-zoo"], ["Friend", "友達 · Tomodachi", "toh-moh-dah-chee"], ["Good night", "おやすみ · Oyasumi", "oh-yah-soo-mee"]] },
-};
+const RETENTION_INTERVALS = [0, 1, 3, 7, 14, 30, 60];
 
-function currentFlashcard() {
-  const deck = FLASHCARD_DECKS[state.learningSettings.language] || FLASHCARD_DECKS.spanish;
-  const seed = Number(datePlus(0).replace(/-/g, ""));
-  const index = (seed + state.flashcardOffset) % deck.cards.length;
-  return { deck, index, card: deck.cards[index], key: state.learningSettings.language + ":" + index };
+function addDaysToKey(key, days) {
+  const value = parseDateKey(key);
+  value.setDate(value.getDate() + days);
+  return dateKey(value);
 }
 
-function persistLearning() { localStorage.setItem("hh-learning-settings", JSON.stringify(state.learningSettings)); }
+function daysBetween(first, second) {
+  return Math.floor((parseDateKey(second) - parseDateKey(first)) / 86400000);
+}
 
-function renderFlashcard() {
-  const current = currentFlashcard();
-  $("#learningLanguage").value = state.learningSettings.language;
-  $("#flashcardHeading").textContent = "Today’s " + current.deck.label + " word";
-  $("#flashcardPrompt").textContent = current.card[0];
-  $("#flashcardAnswer").textContent = state.flashcardRevealed ? current.card[1] : "Tap to reveal";
-  $("#flashcardPronunciation").textContent = state.flashcardRevealed ? current.card[2] : "";
-  $("#flashcard").classList.toggle("revealed", state.flashcardRevealed);
-  $("#hearFlashcardButton").disabled = !state.flashcardRevealed || !("speechSynthesis" in window);
-  const learnedKeys = Object.keys(state.learningSettings.learned || {}).filter((key) => key.startsWith(state.learningSettings.language + ":"));
-  const learned = Boolean(state.learningSettings.learned && state.learningSettings.learned[current.key]);
-  $("#learnedFlashcardButton").textContent = learned ? "✓ Learned" : "I learned this";
-  $("#learnedFlashcardButton").classList.toggle("is-learned", learned);
-  $("#learningProgress").textContent = learnedKeys.length + " of " + current.deck.cards.length + " " + current.deck.label + " words learned on this device";
+function allLanguageCards(pack) {
+  return pack.modules.flatMap((module) => module.cards.map((card) => ({
+    ...card,
+    moduleId: module.id,
+    moduleTitle: module.title,
+    level: card.level || module.level || "A1",
+    kind: card.kind || module.kind || "foundations",
+  })));
+}
+
+function languagePersonProgress(personId) {
+  if (!state.languageProgress[personId] || typeof state.languageProgress[personId] !== "object") state.languageProgress[personId] = {};
+  const person = state.languageProgress[personId];
+  if (!Number.isFinite(Number(person.xp))) person.xp = 0;
+  if (!person.languages || typeof person.languages !== "object") person.languages = {};
+  if (!person.daily || typeof person.daily !== "object") person.daily = {};
+  return person;
+}
+
+function languageCourseProgress(personId, packId) {
+  const person = languagePersonProgress(personId);
+  if (!person.languages[packId] || typeof person.languages[packId] !== "object") person.languages[packId] = { cards: {} };
+  if (!person.languages[packId].cards || typeof person.languages[packId].cards !== "object") person.languages[packId].cards = {};
+  return person.languages[packId];
+}
+
+function languageCardProgress(personId, packId, cardId) {
+  const course = languageCourseProgress(personId, packId);
+  if (!course.cards[cardId] || typeof course.cards[cardId] !== "object") course.cards[cardId] = { stage: 0, correctDays: [], reviews: 0, lapses: 0, dueDate: datePlus(0) };
+  const record = course.cards[cardId];
+  record.stage = Math.max(0, Math.min(RETENTION_INTERVALS.length - 1, Number(record.stage) || 0));
+  record.correctDays = Array.isArray(record.correctDays) ? [...new Set(record.correctDays)].sort() : [];
+  return record;
+}
+
+function existingLanguageCardProgress(personId, packId, cardId) {
+  const person = state.languageProgress && state.languageProgress[personId];
+  const course = person && person.languages && person.languages[packId];
+  const record = course && course.cards && course.cards[cardId];
+  return record && typeof record === "object" ? record : null;
+}
+
+function cardIsRetained(record) {
+  return Boolean(record) && Number(record.stage) >= 2 && Array.isArray(record.correctDays) && record.correctDays.length >= 2;
+}
+
+function cardIsMastered(record) {
+  return Boolean(record) && Number(record.stage) >= 5 && Array.isArray(record.correctDays) && record.correctDays.length >= 5 && daysBetween(record.correctDays[0], record.correctDays[record.correctDays.length - 1]) >= 14;
+}
+
+function languageStats(personId, pack) {
+  const cards = allLanguageCards(pack);
+  const records = cards.map((card) => existingLanguageCardProgress(personId, pack.id, card.id)).filter(Boolean);
+  return {
+    total: cards.length,
+    started: records.filter((record) => record.stage > 0 || record.reviews > 0).length,
+    retained: records.filter(cardIsRetained).length,
+    mastered: records.filter(cardIsMastered).length,
+    due: records.filter((record) => record.stage > 0 && (record.dueDate || datePlus(0)) <= datePlus(0)).length,
+  };
+}
+
+function languageLevelStats(personId, pack, level) {
+  const cards = allLanguageCards(pack).filter((card) => level === "all" || card.level === level);
+  const records = cards.map((card) => existingLanguageCardProgress(personId, pack.id, card.id)).filter(Boolean);
+  return {
+    total: cards.length,
+    retained: records.filter(cardIsRetained).length,
+    mastered: records.filter(cardIsMastered).length,
+  };
+}
+
+function combinedLanguageStats(personId) {
+  const stats = LANGUAGE_PACKS.map((pack) => languageStats(personId, pack));
+  return {
+    retained: stats.reduce((sum, item) => sum + item.retained, 0),
+    mastered: stats.reduce((sum, item) => sum + item.mastered, 0),
+    xp: languagePersonProgress(personId).xp,
+  };
+}
+
+function dailyLanguageRecord(personId) {
+  const person = languagePersonProgress(personId);
+  const today = datePlus(0);
+  if (!person.daily[today] || typeof person.daily[today] !== "object") person.daily[today] = { reviewedIds: [], correctIds: [], completed: false, bonusAwarded: false };
+  const daily = person.daily[today];
+  daily.reviewedIds = Array.isArray(daily.reviewedIds) ? [...new Set(daily.reviewedIds)] : [];
+  daily.correctIds = Array.isArray(daily.correctIds) ? [...new Set(daily.correctIds)] : [];
+  return daily;
+}
+
+function languageStreak(personId) {
+  const daily = languagePersonProgress(personId).daily;
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0);
+  if (!daily[dateKey(cursor)] || !daily[dateKey(cursor)].completed) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  for (let guard = 0; guard < 730; guard += 1) {
+    const record = daily[dateKey(cursor)];
+    if (!record || !record.completed) break;
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function moduleIsUnlocked(personId, pack, moduleIndex) {
+  if (moduleIndex === 0) return true;
+  const module = pack.modules[moduleIndex];
+  if (module.cards.some((card) => Number(existingLanguageCardProgress(personId, pack.id, card.id)?.reviews) > 0)) return true;
+  const previous = pack.modules[moduleIndex - 1];
+  const retained = previous.cards.filter((card) => cardIsRetained(existingLanguageCardProgress(personId, pack.id, card.id))).length;
+  return retained >= Math.ceil(previous.cards.length * .6);
+}
+
+function persistLanguageProgress() { localStorage.setItem("hh-language-progress", JSON.stringify(state.languageProgress)); }
+function persistLanguageSettings() { localStorage.setItem("hh-learning-settings", JSON.stringify(state.languageSettings)); }
+function persistLanguageView() { localStorage.setItem("hh-language-view", JSON.stringify({ selectedPack: state.languagePack, selectedLearner: state.languageProfile, selectedLevel: state.languageLevelFilter })); }
+
+function openLanguageSettings() {
+  $("#languageDailyGoalInput").value = String(Math.max(1, Number(state.languageSettings.dailyGoal) || 5));
+  $("#languageBonusEnabledInput").checked = Boolean(state.languageSettings.bonusEnabled);
+  $("#languageDailyBonusInput").value = String(Math.max(0, Number(state.languageSettings.dailyBonus) || 0));
+  elements.languageSettingsDialog.showModal();
+}
+
+function renderLanguageLeaderboard(targetId, compact) {
+  const rows = familyConfig.members.map((member) => ({ id: member.id, name: member.name, avatar: member.name.charAt(0).toUpperCase(), color: member.color, ...combinedLanguageStats(member.id) }))
+    .sort((a, b) => b.retained - a.retained || b.mastered - a.mastered || b.xp - a.xp || a.name.localeCompare(b.name));
+  const target = $(targetId);
+  if (!target) return;
+  target.innerHTML = rows.slice(0, compact ? 5 : rows.length).map((row, index) => '<article class="league-row' + (row.id === state.languageProfile ? " current" : "") + '"><b>' + (index + 1) + '</b><span class="league-avatar" style="--league-color:' + row.color + '">' + escapeHtml(row.avatar) + '</span><span class="league-name"><strong>' + escapeHtml(row.name) + '</strong><small>' + row.mastered + ' mastered · ' + row.xp + ' XP</small></span><span class="league-score"><strong>' + row.retained + '</strong><small>retained</small></span></article>').join("");
+}
+
+function renderLearning() {
+  const pack = languagePackById(state.languagePack);
+  if (!pack) return;
+  if (isChildProfile(state.profile)) state.languageProfile = state.profile;
+  if (!PROFILES[state.languageProfile] || state.languageProfile === "family") state.languageProfile = familyConfig.members[0].id;
+  $("#languageLearnerSelect").disabled = isChildProfile(state.profile);
+  $("#languageLearnerSelect").value = state.languageProfile;
+  $("#languagePackSelect").value = pack.id;
+  const stats = languageStats(state.languageProfile, pack);
+  const daily = dailyLanguageRecord(state.languageProfile);
+  const goal = Math.max(1, Number(state.languageSettings.dailyGoal) || 5);
+  const completed = Math.min(goal, daily.reviewedIds.length);
+  $("#learningCourseTitle").textContent = pack.flag + " " + pack.name + " · " + pack.nativeName;
+  $("#learningForLabel").textContent = profileName(state.languageProfile) + "’s course";
+  const courseLabel = pack.cefrMax === "B1" ? "B1 preparation" : pack.cefrMax === "A2" ? "A1–A2 foundations" : "A1 introduction";
+  $("#learningCatalogMeta").textContent = stats.total + " offline cards · " + (pack.levels || ["A1"]).join(" → ") + " · " + courseLabel;
+  $("#learningRetainedCount").textContent = stats.retained;
+  $("#learningMasteredCount").textContent = stats.mastered;
+  $("#learningDueCount").textContent = stats.due;
+  $("#learningStreakCount").textContent = languageStreak(state.languageProfile);
+  $("#dailyLearningProgress").textContent = completed + " / " + goal + " unique reviews";
+  $("#dailyLearningBar").style.width = Math.round(completed / goal * 100) + "%";
+  $("#dailyLearningCopy").textContent = daily.completed ? daily.bonusAwarded ? "Daily practice complete · reward bonus earned" : "Daily practice complete · keep the streak alive tomorrow" : "Short, spaced reviews build stronger memory than cramming.";
+  $("#startDailyLearningButton").textContent = stats.due ? "Review " + stats.due + " due card" + (stats.due === 1 ? "" : "s") : daily.completed ? "Optional practice" : "Start daily practice";
+  const levels = pack.levels || ["A1"];
+  if (state.languageLevelFilter !== "all" && !levels.includes(state.languageLevelFilter)) state.languageLevelFilter = "all";
+  $("#learningPathTitle").textContent = state.languageLevelFilter === "all" ? "Complete course path" : state.languageLevelFilter + " pathway";
+  $("#languageLevelFilters").innerHTML = ["all", ...levels].map((level) => {
+    const levelStats = languageLevelStats(state.languageProfile, pack, level);
+    const label = level === "all" ? "All levels" : level;
+    return '<button class="' + (state.languageLevelFilter === level ? "active" : "") + '" data-language-level="' + level + '" type="button"><strong>' + label + '</strong><span>' + levelStats.retained + '/' + levelStats.total + ' retained</span></button>';
+  }).join("");
+  const visibleModules = pack.modules.map((module, index) => ({ module, index })).filter(({ module }) => state.languageLevelFilter === "all" || (module.level || "A1") === state.languageLevelFilter);
+  $("#languageModuleGrid").innerHTML = visibleModules.map(({ module, index }) => {
+    const unlocked = moduleIsUnlocked(state.languageProfile, pack, index);
+    const retained = module.cards.filter((card) => cardIsRetained(existingLanguageCardProgress(state.languageProfile, pack.id, card.id))).length;
+    const mastered = module.cards.filter((card) => cardIsMastered(existingLanguageCardProgress(state.languageProfile, pack.id, card.id))).length;
+    const started = module.cards.filter((card) => Number(existingLanguageCardProgress(state.languageProfile, pack.id, card.id)?.reviews) > 0).length;
+    const percent = Math.round(retained / module.cards.length * 100);
+    const kind = String(module.kind || "foundations").replace(/-/g, " ");
+    return '<article class="language-module' + (unlocked ? "" : " locked") + '"><header><span>' + escapeHtml(module.icon) + '</span><div><small>' + escapeHtml(module.level || "A1") + ' · ' + escapeHtml(kind) + ' · Module ' + (index + 1) + '</small><strong>' + escapeHtml(module.title) + '</strong></div><b>' + (unlocked ? retained + "/" + module.cards.length : "🔒") + '</b></header><p class="module-description">' + escapeHtml(module.description || "Practice useful words and phrases.") + '</p><div class="module-progress"><span style="width:' + percent + '%"></span></div><p class="module-status">' + (unlocked ? mastered + " mastered · " + started + " introduced" : "Retain 60% of the previous module to unlock") + '</p><button data-start-language-module="' + module.id + '" type="button" ' + (unlocked ? "" : "disabled") + '>' + (started ? "Study & review" : "Begin module") + "</button></article>";
+  }).join("");
+  renderLanguageLeaderboard("#languageLeaderboard", false);
+  renderLanguageLeaderboard("#homeLanguageLeaderboard", true);
+  const combined = combinedLanguageStats(state.languageProfile);
+  $("#languageWidgetSummary").textContent = profileName(state.languageProfile) + " has retained " + combined.retained + " word" + (combined.retained === 1 ? "" : "s");
+}
+
+function shuffled(values) {
+  return values.slice().sort(() => Math.random() - .5);
+}
+
+function sessionQuestion(card, pack) {
+  const record = languageCardProgress(state.languageProfile, pack.id, card.id);
+  const reverse = record.reviews % 2 === 1;
+  const all = allLanguageCards(pack).filter((item) => item.id !== card.id);
+  const correct = reverse ? card.prompt : card.answer;
+  const sameKind = shuffled(all.filter((item) => item.level === card.level && item.kind === card.kind));
+  const sameLevel = shuffled(all.filter((item) => item.level === card.level && item.kind !== card.kind));
+  const ranked = [...sameKind, ...sameLevel, ...shuffled(all)];
+  const seen = new Set();
+  const distractors = [];
+  for (const item of ranked) {
+    const value = reverse ? item.prompt : item.answer;
+    if (value === correct || seen.has(value)) continue;
+    seen.add(value);
+    distractors.push(value);
+    if (distractors.length === 3) break;
+  }
+  return {
+    reverse,
+    prompt: reverse ? card.answer : card.prompt,
+    label: reverse ? "Choose the English meaning" : "Choose the " + pack.name + " answer",
+    correct,
+    options: shuffled([correct, ...distractors]),
+  };
+}
+
+function beginLanguageSession(moduleId) {
+  const pack = languagePackById(state.languagePack);
+  const all = allLanguageCards(pack);
+  let candidates;
+  if (moduleId) {
+    const module = pack.modules.find((item) => item.id === moduleId);
+    candidates = module ? module.cards.map((card) => ({ ...card, moduleId: module.id, moduleTitle: module.title, level: card.level || module.level || "A1", kind: card.kind || module.kind || "foundations" })) : [];
+  } else {
+    const unlockedIds = new Set(pack.modules.filter((module, index) => moduleIsUnlocked(state.languageProfile, pack, index)).map((module) => module.id));
+    const available = all.filter((card) => unlockedIds.has(card.moduleId));
+    const reviewedToday = new Set(dailyLanguageRecord(state.languageProfile).reviewedIds);
+    const due = available.filter((card) => {
+      const record = existingLanguageCardProgress(state.languageProfile, pack.id, card.id);
+      return !reviewedToday.has(card.id) && Number(record?.stage) > 0 && (record.dueDate || datePlus(0)) <= datePlus(0);
+    }).sort((a, b) => String(existingLanguageCardProgress(state.languageProfile, pack.id, a.id)?.dueDate || "").localeCompare(String(existingLanguageCardProgress(state.languageProfile, pack.id, b.id)?.dueDate || "")));
+    const fresh = available.filter((card) => {
+      const record = existingLanguageCardProgress(state.languageProfile, pack.id, card.id);
+      return !reviewedToday.has(card.id) && (!record || Number(record.stage) === 0 && Number(record.reviews) === 0);
+    });
+    const goal = Math.max(1, Number(state.languageSettings.dailyGoal) || 5);
+    candidates = due.slice(0, 12);
+    if (candidates.length < goal) candidates = candidates.concat(fresh.slice(0, goal - candidates.length));
+    if (!candidates.length) candidates = available.slice(0, Math.min(goal, available.length));
+  }
+  if (!candidates.length) return showToast("This module has no cards yet");
+  state.languageSession = { packId: pack.id, cards: candidates, index: 0, phase: "", correct: 0, answered: 0, selected: null, question: null };
+  prepareLanguageSessionCard();
+  elements.languageSessionDialog.showModal();
+}
+
+function prepareLanguageSessionCard() {
+  const session = state.languageSession;
+  if (!session || session.index >= session.cards.length) {
+    if (session) session.phase = "complete";
+    renderLanguageSession();
+    return;
+  }
+  const pack = languagePackById(session.packId);
+  const card = session.cards[session.index];
+  const record = languageCardProgress(state.languageProfile, pack.id, card.id);
+  session.phase = record.stage === 0 && record.reviews === 0 ? "teach" : "question";
+  session.selected = null;
+  session.question = sessionQuestion(card, pack);
+  renderLanguageSession();
+}
+
+function renderLanguageSession() {
+  const session = state.languageSession;
+  if (!session) return;
+  const complete = session.phase === "complete";
+  $("#languageSessionProgress").textContent = complete ? "Complete" : session.index + 1 + " of " + session.cards.length;
+  $("#languageSessionBar").style.width = (complete ? 100 : session.index / session.cards.length * 100) + "%";
+  $("#languagePracticeButton").hidden = session.phase !== "teach";
+  $("#languageNextButton").hidden = !["answered", "complete"].includes(session.phase);
+  $("#languageNextButton").textContent = complete ? "Done" : session.index === session.cards.length - 1 ? "Finish" : "Next card";
+  $("#hearLanguageButton").hidden = !["teach", "answered"].includes(session.phase);
+  $("#languageAnswerBlock").hidden = !["teach", "answered"].includes(session.phase);
+  $("#languageChoices").hidden = session.phase !== "question" && session.phase !== "answered";
+  if (complete) {
+    $("#languageSessionEyebrow").textContent = "Practice complete";
+    $("#languageSessionTitle").textContent = "Nice steady work";
+    $("#languageQuestionLabel").textContent = "Long-term learning";
+    $("#languageQuestion").textContent = session.correct + " of " + session.answered + " answered correctly";
+    $("#languageChoices").innerHTML = "";
+    $("#languageFeedback").textContent = "Today’s first attempts are saved. Cards return on spaced review days before they can count as retained or mastered.";
+    return;
+  }
+  const pack = languagePackById(session.packId);
+  const card = session.cards[session.index];
+  $("#languageSessionEyebrow").textContent = (card.level || "A1") + " · " + String(card.kind || "foundations").replace(/-/g, " ") + " · " + (card.moduleTitle || pack.name);
+  $("#languageSessionTitle").textContent = session.phase === "teach" ? "Meet a new card" : "Recall from memory";
+  $("#languageQuestionLabel").textContent = session.phase === "teach" ? "English" : session.question.label;
+  $("#languageQuestion").textContent = session.phase === "teach" ? card.prompt : session.question.prompt;
+  $("#languageAnswer").textContent = card.answer;
+  $("#languagePronunciation").textContent = card.pronunciation || "";
+  $("#languageNote").textContent = card.note || "";
+  $("#languageFeedback").textContent = session.phase === "answered" ? session.selected === session.question.correct ? "Correct — this card has been scheduled for a later day." : "Not this time. The correct answer is shown above, and the card will return." : session.phase === "teach" ? "Read and listen first. Then practice recalling it without the answer visible." : "Choose once. Only the first attempt today affects retention progress.";
+  $("#languageFeedback").className = "language-feedback " + (session.phase === "answered" ? session.selected === session.question.correct ? "correct" : "incorrect" : "");
+  $("#languageChoices").innerHTML = session.question.options.map((option) => '<button class="' + (session.phase === "answered" && option === session.question.correct ? "correct" : session.phase === "answered" && option === session.selected ? "incorrect" : "") + '" data-language-choice="' + escapeHtml(option) + '" type="button" ' + (session.phase === "answered" ? "disabled" : "") + '>' + escapeHtml(option) + "</button>").join("");
+}
+
+function awardDailyLanguageBonus(personId) {
+  const daily = dailyLanguageRecord(personId);
+  const goal = Math.max(1, Number(state.languageSettings.dailyGoal) || 5);
+  if (daily.reviewedIds.length < goal || daily.completed) return;
+  daily.completed = true;
+  const bonus = Math.max(0, Number(state.languageSettings.dailyBonus) || 0);
+  if (state.languageSettings.bonusEnabled && bonus > 0 && state.rewards[personId]) {
+    state.rewards[personId].points += bonus;
+    daily.bonusAwarded = true;
+    persistRewards();
+    logActivity(profileName(personId) + " completed daily language practice (+" + bonus + " reward points)", "文", "rewards");
+    showToast("Daily language goal complete · +" + bonus + " reward points!");
+  } else {
+    logActivity(profileName(personId) + " completed daily language practice", "文", "habits");
+    showToast("Daily language goal complete · streak saved!");
+  }
+}
+
+function recordLanguageAnswer(option) {
+  const session = state.languageSession;
+  if (!session || session.phase !== "question") return;
+  const pack = languagePackById(session.packId);
+  const card = session.cards[session.index];
+  const record = languageCardProgress(state.languageProfile, pack.id, card.id);
+  const correct = option === session.question.correct;
+  const today = datePlus(0);
+  record.reviews = (Number(record.reviews) || 0) + 1;
+  if (!record.firstSeenDate) record.firstSeenDate = today;
+  if (record.lastReviewDate !== today) {
+    record.lastReviewDate = today;
+    if (correct) {
+      record.correctDays = [...new Set(record.correctDays.concat(today))].sort();
+      record.stage = Math.min(RETENTION_INTERVALS.length - 1, record.stage + 1);
+      record.dueDate = addDaysToKey(today, RETENTION_INTERVALS[record.stage]);
+    } else {
+      record.lapses = (Number(record.lapses) || 0) + 1;
+      record.stage = Math.max(0, record.stage - 1);
+      record.dueDate = today;
+    }
+  }
+  const daily = dailyLanguageRecord(state.languageProfile);
+  if (!daily.reviewedIds.includes(card.id)) {
+    daily.reviewedIds.push(card.id);
+    if (correct) daily.correctIds.push(card.id);
+    if (correct) languagePersonProgress(state.languageProfile).xp += 10;
+  }
+  session.selected = option;
+  session.phase = "answered";
+  session.answered += 1;
+  if (correct) session.correct += 1;
+  awardDailyLanguageBonus(state.languageProfile);
+  persistLanguageProgress();
+  renderLanguageSession();
+  renderLearning();
+  renderRewards();
+}
+
+function speakCurrentLanguageCard() {
+  const session = state.languageSession;
+  if (!session || session.index >= session.cards.length) return;
+  if (!("speechSynthesis" in window)) return showToast("Speech playback is not available on this device");
+  const pack = languagePackById(session.packId);
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(session.cards[session.index].answer.replace(/…/g, ""));
+  utterance.lang = pack.voice;
+  utterance.rate = .82;
+  speechSynthesis.speak(utterance);
 }
 
 function createMemoryGame() {
@@ -1554,7 +1914,6 @@ function renderReactionGame() {
 }
 
 function renderFun() {
-  renderFlashcard();
   renderReactionGame();
   renderMemoryGame();
 }
@@ -1574,6 +1933,7 @@ function renderAll() {
   renderVacationMode();
   renderConnection();
   renderSettingsSummary();
+  renderLearning();
   renderFun();
   applyHomeLayout();
 }
@@ -1613,6 +1973,10 @@ function selectProfile(profileId, options) {
   state.rewardOwner = PROFILES[profileId].rewardOwner || firstChildId();
   state.choreFilter = profileId === "family" ? "all" : profileId;
   state.habitFilter = profileId === "family" ? "all" : profileId;
+  if (profileId !== "family") {
+    state.languageProfile = profileId;
+    persistLanguageView();
+  }
   localStorage.setItem("hh-profile", profileId);
   const profile = PROFILES[profileId];
   document.body.dataset.profile = profileId;
@@ -1649,6 +2013,7 @@ function navigateTo(viewId, options) {
   }
   if (viewId === "calendar") renderCalendar();
   if (viewId === "art") renderArt();
+  if (viewId === "learning") renderLearning();
   if (viewId === "fun") renderFun();
   resetIdleDeadline();
   updateIdleCountdown();
@@ -1954,6 +2319,7 @@ async function submitParentAuth() {
     if (context.action === "familySetup") openFamilySetup();
     if (context.action === "addChore") openChoreForm(true);
     if (context.action === "manageRewards") openRewardManager(context.rewardOwner, true);
+    if (context.action === "languageSettings") openLanguageSettings();
   } catch (error) {
     $("#passcodeError").textContent = "Passcode verification could not finish. Please try again.";
     input.focus();
@@ -2597,40 +2963,57 @@ $("#closeFamilySetupButton").addEventListener("click", () => {
   if (!SETUP_REQUIRED) elements.familySetupDialog.close();
 });
 
-$("#learningLanguage").addEventListener("change", (event) => {
-  state.learningSettings.language = event.target.value;
-  state.flashcardOffset = 0;
-  state.flashcardRevealed = false;
-  persistLearning();
-  renderFlashcard();
+$("#languageLearnerSelect").addEventListener("change", (event) => {
+  if (!PROFILES[event.target.value] || event.target.value === "family") return;
+  state.languageProfile = event.target.value;
+  persistLanguageView();
+  renderLearning();
 });
-$("#flashcard").addEventListener("click", () => {
-  state.flashcardRevealed = !state.flashcardRevealed;
-  renderFlashcard();
+$("#languagePackSelect").addEventListener("change", (event) => {
+  if (!languagePackById(event.target.value)) return;
+  state.languagePack = event.target.value;
+  state.languageLevelFilter = "all";
+  persistLanguageView();
+  renderLearning();
 });
-$("#nextFlashcardButton").addEventListener("click", () => {
-  state.flashcardOffset += 1;
-  state.flashcardRevealed = false;
-  renderFlashcard();
+$("#languageLevelFilters").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-language-level]");
+  if (!button) return;
+  state.languageLevelFilter = button.dataset.languageLevel;
+  persistLanguageView();
+  renderLearning();
 });
-$("#learnedFlashcardButton").addEventListener("click", () => {
-  const current = currentFlashcard();
-  state.learningSettings.learned = state.learningSettings.learned || {};
-  state.learningSettings.learned[current.key] = new Date().toISOString();
-  const today = datePlus(0);
-  state.learningSettings.streakDates = [...new Set((state.learningSettings.streakDates || []).concat(today))].slice(-365);
-  persistLearning();
-  renderFlashcard();
-  showToast("Great job — this word is marked learned!");
+$("#startDailyLearningButton").addEventListener("click", () => beginLanguageSession());
+$("#languageModuleGrid").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-start-language-module]");
+  if (button && !button.disabled) beginLanguageSession(button.dataset.startLanguageModule);
 });
-$("#hearFlashcardButton").addEventListener("click", () => {
-  const current = currentFlashcard();
-  if (!state.flashcardRevealed || !("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(current.card[1].split(" · ")[0]);
-  utterance.lang = current.deck.voice;
-  speechSynthesis.speak(utterance);
+$("#languageChoices").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-language-choice]");
+  if (button && !button.disabled) recordLanguageAnswer(button.dataset.languageChoice);
 });
+$("#languagePracticeButton").addEventListener("click", () => {
+  if (!state.languageSession || state.languageSession.phase !== "teach") return;
+  state.languageSession.phase = "question";
+  renderLanguageSession();
+});
+$("#languageNextButton").addEventListener("click", () => {
+  if (!state.languageSession) return;
+  if (state.languageSession.phase === "complete") {
+    elements.languageSessionDialog.close();
+    state.languageSession = null;
+    return;
+  }
+  if (state.languageSession.phase !== "answered") return;
+  state.languageSession.index += 1;
+  prepareLanguageSessionCard();
+});
+$("#hearLanguageButton").addEventListener("click", speakCurrentLanguageCard);
+$("#closeLanguageSessionButton").addEventListener("click", () => {
+  elements.languageSessionDialog.close();
+  state.languageSession = null;
+});
+elements.languageSessionDialog.addEventListener("cancel", () => { state.languageSession = null; });
 $("#reactionPad").addEventListener("click", () => {
   const game = state.reactionGame;
   if (game.status === "waiting") {
@@ -3268,6 +3651,26 @@ function requestGoogleSettingsAccess() {
 }
 $("#googleCalendarButton").addEventListener("click", requestGoogleSettingsAccess);
 $("#connectCalendarButton").addEventListener("click", requestGoogleSettingsAccess);
+function requestLanguageSettingsAccess() {
+  if (PROFILES[state.profile].adult) openLanguageSettings();
+  else requestParentAuth({ action: "languageSettings" });
+}
+$("#languageSettingsButton").addEventListener("click", requestLanguageSettingsAccess);
+$("#languageSettingsTile").addEventListener("click", requestLanguageSettingsAccess);
+$("#languageSettingsForm").addEventListener("submit", (event) => {
+  if (!event.submitter || event.submitter.value !== "save") return;
+  event.preventDefault();
+  const dailyGoal = Math.max(1, Math.min(20, Number($("#languageDailyGoalInput").value) || 5));
+  const dailyBonus = Math.max(0, Math.min(50, Number($("#languageDailyBonusInput").value) || 0));
+  state.languageSettings.dailyGoal = dailyGoal;
+  state.languageSettings.bonusEnabled = $("#languageBonusEnabledInput").checked;
+  state.languageSettings.dailyBonus = dailyBonus;
+  persistLanguageSettings();
+  elements.languageSettingsDialog.close();
+  logActivity("Updated language practice to " + dailyGoal + " cards daily" + (state.languageSettings.bonusEnabled && dailyBonus ? " with a +" + dailyBonus + " child point bonus" : " with no point bonus"), "文", "settings");
+  renderAll();
+  showToast("Language learning settings saved");
+});
 $("#backupButton").addEventListener("click", () => {
   if (PROFILES[state.profile].adult) openBackup();
   else requestParentAuth({ action: "backup" });
@@ -3404,7 +3807,7 @@ document.addEventListener("click", (event) => {
     navigateTo(nav.dataset.view);
   }
 });
-$$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
+$$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#languageSettingsTile):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js?v=" + encodeURIComponent(APP_VERSION), { updateViaCache: "none" }).catch(() => {}));
 
