@@ -168,7 +168,7 @@
         </section>
 
         <section class="app-view full-app-view" id="calendarView" data-app-view="calendar" hidden>
-          <header class="view-header"><div><p class="eyebrow">Shared schedule</p><h1>Family calendar</h1><p>Imported schedules and family-added plans live together here.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="connectCalendarButton" type="button">Connect calendar</button><button class="primary-button" id="addEventButton" type="button">+ Add event</button></div></header>
+          <header class="view-header"><div><p class="eyebrow">Shared schedule</p><h1>Family calendar</h1><p>Imported schedules and family-added plans live together here.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="connectCalendarButton" type="button">Connect Google Calendar</button><button class="primary-button" id="addEventButton" type="button">+ Add event</button></div></header>
           <div class="week-strip" id="weekStrip"></div>
           <div class="calendar-agenda" id="calendarAgenda"></div>
         </section>
@@ -197,11 +197,12 @@
           <header class="view-header"><div><p class="eyebrow">HouseHelper controls</p><h1>Settings</h1><p>Personalize the kitchen dashboard and family experience.</p></div></header>
           <div class="settings-grid">
             <button class="settings-tile" id="settingsLayoutButton" type="button"><span class="settings-icon"><svg><use href="#icon-settings"></use></svg></span><span><strong>Home layout</strong><small>Resize, reorder, or hide widgets</small></span><b>›</b></button>
-            <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-star"></use></svg></span><span><strong>Profile themes</strong><small>Colors, type, icon size, and priorities</small></span><b>›</b></button>
-            <button class="settings-tile" type="button"><span class="settings-icon"><svg><use href="#icon-moon"></use></svg></span><span><strong>Sleep & wake</strong><small>Calm mode currently begins at 9:00 PM</small></span><b>›</b></button>
+            <button class="settings-tile" id="profileThemesButton" type="button"><span class="settings-icon"><svg><use href="#icon-star"></use></svg></span><span><strong>Profile themes</strong><small id="profileThemeLabel">Colors, type, icon size, and personality</small></span><b>›</b></button>
+            <button class="settings-tile" id="sleepWakeButton" type="button"><span class="settings-icon"><svg><use href="#icon-moon"></use></svg></span><span><strong>Sleep & wake</strong><small id="sleepWakeLabel">Calm mode currently begins at 9:00 PM</small></span><b>›</b></button>
             <button class="settings-tile" id="vacationModeButton" type="button"><span class="settings-icon">☀</span><span><strong>Vacation mode</strong><small id="vacationModeLabel">Repeating chores are running normally</small></span><b>›</b></button>
             <button class="settings-tile" id="activityButton" type="button"><span class="settings-icon"><svg><use href="#icon-list"></use></svg></span><span><strong>Household activity</strong><small>Approvals, rewards, schedules, and changes</small></span><b>›</b></button>
-            <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Backup & restore</strong><small>Download or import this device’s family data</small></span><b>›</b></button>
+            <button class="settings-tile" id="googleCalendarButton" type="button"><span class="settings-icon"><svg><use href="#icon-calendar"></use></svg></span><span><strong>Google Calendar</strong><small id="googleCalendarLabel">Connect shared family schedules</small></span><b>›</b></button>
+            <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Local data & backup</strong><small id="storageTileLabel">Saved privately in this browser</small></span><b>›</b></button>
           </div>
         </section>
       </main>
@@ -220,9 +221,9 @@
 
     <div class="calm-screen" id="calmScreen" aria-hidden="true">
       <button class="wake-area" id="wakeButton" type="button" aria-label="Exit calm mode">
-        <span class="calm-date" id="calmDate"></span>
-        <strong class="calm-time" id="calmTime"></strong>
-        <span class="calm-message">The house is resting</span>
+        <span class="calm-visual" id="calmVisual" aria-hidden="true"></span>
+        <span class="calm-shade" aria-hidden="true"></span>
+        <span class="calm-content"><span class="calm-date" id="calmDate"></span><strong class="calm-time" id="calmTime"></strong><span class="calm-message" id="calmMessage">The house is resting</span></span>
         <span class="wake-hint">Tap anywhere to wake</span>
       </button>
     </div>
@@ -303,6 +304,75 @@
       </form>
     </dialog>
 
+    <dialog id="themeDialog" class="app-dialog settings-dialog-wide">
+      <form method="dialog" class="dialog-panel" id="themeForm">
+        <div class="dialog-header"><div><p class="eyebrow">Make it yours</p><h2>Profile theme</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <label class="field theme-profile-field"><span>Customize dashboard</span><select id="themeProfileInput"><option value="family">Family</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <p class="field-label">Accent color</p>
+          <div class="theme-swatches" id="themeSwatches" aria-label="Theme colors"><button data-theme-color="#14392f" style="--theme-swatch:#14392f" type="button" aria-label="Forest"></button><button data-theme-color="#203e63" style="--theme-swatch:#203e63" type="button" aria-label="Blue"></button><button data-theme-color="#5b365f" style="--theme-swatch:#5b365f" type="button" aria-label="Plum"></button><button data-theme-color="#78325c" style="--theme-swatch:#78325c" type="button" aria-label="Pink"></button><button data-theme-color="#174c69" style="--theme-swatch:#174c69" type="button" aria-label="Ocean"></button><button data-theme-color="#8a4b20" style="--theme-swatch:#8a4b20" type="button" aria-label="Amber"></button></div>
+          <div class="form-grid">
+            <label class="field"><span>Custom color</span><input id="themeColorInput" type="color" value="#14392f" /></label>
+            <label class="field"><span>Text style</span><select id="themeFontInput"><option value="rounded">Friendly rounded</option><option value="classic">Storybook serif</option><option value="clean">Clean modern</option></select></label>
+            <label class="field"><span>Control size</span><select id="themeScaleInput"><option value="normal">Comfortable</option><option value="large">Large</option><option value="extra">Extra large</option></select></label>
+            <label class="check-field"><input id="themeDecorationsInput" type="checkbox" checked /><span><strong>Playful decorations</strong><small>Show profile flourishes and personality.</small></span></label>
+          </div>
+          <div class="theme-preview" id="themePreview"><span>★</span><div><strong>Live preview</strong><small>Buttons, headings, and highlights update after saving.</small></div><button type="button">Sample button</button></div>
+        </div>
+        <div class="dialog-footer"><button class="text-button" id="resetThemeButton" type="button">Reset theme</button><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save theme</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="sleepDialog" class="app-dialog settings-dialog-wide">
+      <form method="dialog" class="dialog-panel" id="sleepForm">
+        <div class="dialog-header"><div><p class="eyebrow">A calmer kitchen</p><h2>Sleep & wake</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <label class="check-field"><input id="sleepEnabledInput" type="checkbox" checked /><span><strong>Use an automatic sleep schedule</strong><small>The dashboard wakes itself at the chosen morning time.</small></span></label>
+          <div class="form-grid"><label class="field"><span>Sleep at</span><input id="sleepTimeInput" type="time" value="21:00" /></label><label class="field"><span>Wake at</span><input id="wakeTimeInput" type="time" value="06:00" /></label></div>
+          <p class="field-label">Calm screen</p>
+          <div class="display-mode-grid" id="sleepDisplayModes">
+            <label><input type="radio" name="sleepDisplay" value="art" checked /><span>🖼</span><strong>Art slideshow</strong><small>Showcase artwork</small></label>
+            <label><input type="radio" name="sleepDisplay" value="before-after" /><span>↔</span><strong>Before & after</strong><small>Completed chores</small></label>
+            <label><input type="radio" name="sleepDisplay" value="static" /><span>▣</span><strong>Static image</strong><small>Your chosen photo</small></label>
+            <label><input type="radio" name="sleepDisplay" value="solid" /><span>●</span><strong>Solid color</strong><small>Simple and dark</small></label>
+          </div>
+          <div class="form-grid"><label class="field"><span>Slide duration</span><select id="sleepIntervalInput"><option value="10">10 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label class="field"><span>Solid background</span><input id="sleepColorInput" type="color" value="#102721" /></label></div>
+          <label class="static-image-upload"><input id="sleepImageInput" type="file" accept="image/*" /><span>Choose a static sleep image</span><small id="sleepImageStatus">No custom image selected</small></label>
+          <label class="check-field"><input id="sleepArchivedArtInput" type="checkbox" /><span><strong>Include archived art</strong><small>Archived pieces can join the nighttime slideshow.</small></span></label>
+        </div>
+        <div class="dialog-footer"><button class="secondary-dark-button" id="previewSleepButton" type="button">Preview calm mode</button><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save schedule</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="vacationDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="vacationForm">
+        <div class="dialog-header"><div><p class="eyebrow">Time away</p><h2>Vacation mode</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <label class="check-field"><input id="vacationEnabledInput" type="checkbox" /><span><strong>Schedule vacation mode</strong><small>It turns on and off automatically using these dates.</small></span></label>
+          <div class="form-grid"><label class="field"><span>First day</span><input id="vacationStartInput" type="date" /></label><label class="field"><span>Last day</span><input id="vacationEndInput" type="date" /></label></div>
+          <label class="check-field"><input id="vacationPauseChoresInput" type="checkbox" checked /><span><strong>Pause repeating chores</strong><small>One-time chores and their reminders remain available.</small></span></label>
+          <label class="check-field"><input id="vacationPauseHabitsInput" type="checkbox" /><span><strong>Pause habit expectations</strong><small>Habits remain visible in the full routine list but are not due on Home.</small></span></label>
+          <div class="vacation-status-card" id="vacationDialogStatus"></div>
+        </div>
+        <div class="dialog-footer"><button class="danger-button" id="endVacationButton" type="button">End vacation now</button><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save vacation</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="googleCalendarDialog" class="app-dialog settings-dialog-wide">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow">Shared schedules</p><h2>Google Calendar</h2></div><button class="close-button" id="closeGoogleCalendarButton" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-body">
+          <div class="connection-status-card" id="googleConnectionStatus"><span></span><div><strong>Not connected</strong><small>Local calendar events are still available.</small></div></div>
+          <label class="field"><span>Google OAuth web client ID</span><input id="googleClientIdInput" type="text" autocomplete="off" placeholder="1234567890-example.apps.googleusercontent.com" /></label>
+          <p class="integration-help">The client ID is public configuration and stays in this browser. Access tokens are kept in memory only and are never backed up. Google sign-in should be completed in Chrome or the installed PWA; embedded preview browsers may block it.</p>
+          <div class="form-grid"><label class="field"><span>Assign imported events to</span><select id="googleOwnerInput"><option value="family">Everyone</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label><label class="field"><span>Import upcoming</span><select id="googleDaysInput"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">6 months</option></select></label></div>
+          <div class="google-calendar-list" id="googleCalendarList"></div>
+          <div class="settings-section"><div><p class="eyebrow">Event reminders</p><h3>Upcoming alerts</h3></div><label class="check-field"><input id="remindersEnabledInput" type="checkbox" checked /><span><strong>Show an in-app popup</strong><small>Works while HouseHelper is open.</small></span></label><div class="form-grid"><label class="field"><span>Alert me</span><select id="reminderLeadInput"><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15" selected>15 minutes before</option><option value="30">30 minutes before</option></select></label><div class="field"><span>Device notification</span><button class="secondary-dark-button" id="enableNotificationsButton" type="button">Enable device alerts</button></div></div><small class="permission-copy" id="notificationPermissionLabel">In-app reminders are already enabled.</small></div>
+        </div>
+        <div class="dialog-footer"><button class="danger-button" id="disconnectGoogleButton" type="button" hidden>Disconnect</button><span class="dialog-spacer"></span><button class="secondary-dark-button" id="syncGoogleButton" type="button" hidden>Sync now</button><button class="primary-button" id="connectGoogleButton" type="button">Save & connect</button></div>
+      </div>
+    </dialog>
+
     <dialog id="rewardDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="rewardForm">
         <div class="dialog-header"><div><p class="eyebrow">Adult controls</p><h2 id="rewardDialogTitle">Manage Harper’s rewards</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
@@ -340,7 +410,8 @@
           <label class="field"><span>Location</span><input id="eventLocationInput" maxlength="50" placeholder="Home" /></label>
           <label class="field"><span>Date</span><input id="eventDateInput" type="date" required /></label>
           <label class="field"><span>Time</span><input id="eventTimeInput" type="time" required /></label>
-          <p class="trust-note field-wide">Everyone—including Harper and Griffin—can add family calendar items. Connected calendars will appear beside these dashboard-created events.</p>
+          <p class="trust-note field-wide" id="eventSourceNote">Everyone—including Harper and Griffin—can add family calendar items. Connected calendars will appear beside these dashboard-created events.</p>
+          <a class="secondary-dark-button google-event-link field-wide" id="openGoogleEventLink" target="_blank" rel="noopener" hidden>Open in Google Calendar</a>
         </div>
         <div class="dialog-footer split-footer"><button class="danger-button" id="deleteEventButton" type="button" hidden>Delete event</button><span></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveEventButton" value="save" type="submit">Add to calendar</button></div>
       </form>
@@ -362,11 +433,15 @@
     </dialog>
 
     <dialog id="activityDialog" class="app-dialog activity-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Household history</p><h2>Recent activity</h2></div><button class="close-button" id="closeActivityButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="activity-list" id="activityList"></div></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Household history</p><h2>Recent activity</h2></div><button class="close-button" id="closeActivityButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="filter-row activity-filters" id="activityFilters"><button class="active" data-activity-filter="all" type="button">Everything</button><button data-activity-filter="chores" type="button">Chores</button><button data-activity-filter="habits" type="button">Habits</button><button data-activity-filter="rewards" type="button">Rewards</button><button data-activity-filter="calendar" type="button">Calendar</button><button data-activity-filter="lists" type="button">Lists</button><button data-activity-filter="settings" type="button">Settings</button></div><div class="activity-summary" id="activitySummary"></div><div class="activity-list" id="activityList"></div></div><div class="dialog-footer"><button class="danger-button" id="clearActivityButton" type="button">Clear history</button><span class="dialog-spacer"></span><button class="secondary-dark-button" id="exportActivityButton" type="button">Export CSV</button><button class="primary-button" id="doneActivityButton" type="button">Done</button></div></div>
     </dialog>
 
     <dialog id="backupDialog" class="app-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local data safety</p><h2>Backup & restore</h2></div><button class="close-button" id="closeBackupButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><p class="backup-copy">Download the dashboard data stored by this browser, or restore a previous HouseHelper backup. Chore photos stored in the browser’s photo database are not included yet.</p><div class="backup-actions"><button class="primary-button" id="downloadBackupButton" type="button">Download backup</button><label class="secondary-dark-button backup-upload">Restore backup<input id="restoreBackupInput" type="file" accept="application/json,.json" /></label></div></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local data safety</p><h2>Local data & backup</h2></div><button class="close-button" id="closeBackupButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="storage-status-card" id="storageStatusCard"><span>✓</span><div><strong>Your changes save locally</strong><small id="storageStatusText">Checking browser storage protection…</small></div></div><p class="backup-copy">HouseHelper data belongs to this website address and this browser profile. Download a backup before clearing browser data or moving to a different device. Chore evidence photos and the sleep-screen image stay in this browser’s photo database and are not included in the JSON backup yet.</p><div class="backup-actions"><button class="secondary-dark-button" id="persistStorageButton" type="button">Protect storage</button><button class="primary-button" id="downloadBackupButton" type="button">Download backup</button><label class="secondary-dark-button backup-upload">Restore backup<input id="restoreBackupInput" type="file" accept="application/json,.json" /></label></div></div></div>
+    </dialog>
+
+    <dialog id="eventReminderDialog" class="app-dialog reminder-dialog">
+      <div class="dialog-panel"><div class="reminder-hero"><span>🔔</span><p class="eyebrow">Coming up soon</p><h2 id="reminderTitle">Family event</h2><p id="reminderDetails">Starts in 15 minutes</p></div><div class="dialog-footer"><button class="secondary-button" id="dismissReminderButton" type="button">Dismiss</button><button class="secondary-dark-button" id="snoozeReminderButton" type="button">Snooze 5 min</button><button class="primary-button" id="openReminderEventButton" type="button">Open calendar</button></div></div>
     </dialog>
 
     <dialog id="artViewerDialog" class="art-viewer-dialog">
@@ -382,7 +457,7 @@
       <div class="paint-panel">
         <div class="paint-header"><div><p class="eyebrow">Finger paint</p><h2>Make something fun</h2></div><button class="close-button" id="closePaintButton" type="button" aria-label="Close painter">×</button></div>
         <div class="paint-toolbar" aria-label="Paint colors">
-          <div class="paint-colors" id="paintColors"><button class="active" data-color="#ef4444" style="--swatch:#ef4444" type="button" aria-label="Red"></button><button data-color="#facc15" style="--swatch:#facc15" type="button" aria-label="Yellow"></button><button data-color="#2563eb" style="--swatch:#2563eb" type="button" aria-label="Blue"></button><button data-color="#f97316" style="--swatch:#f97316" type="button" aria-label="Orange"></button><button data-color="#22c55e" style="--swatch:#22c55e" type="button" aria-label="Green"></button><button data-color="#9333ea" style="--swatch:#9333ea" type="button" aria-label="Purple"></button></div>
+          <div class="paint-colors" id="paintColors"><button class="active" data-color="#ef4444" style="--swatch:#ef4444" type="button" aria-label="Red"></button><button data-color="#facc15" style="--swatch:#facc15" type="button" aria-label="Yellow"></button><button data-color="#2563eb" style="--swatch:#2563eb" type="button" aria-label="Blue"></button><button data-color="#f97316" style="--swatch:#f97316" type="button" aria-label="Orange"></button><button data-color="#22c55e" style="--swatch:#22c55e" type="button" aria-label="Green"></button><button data-color="#9333ea" style="--swatch:#9333ea" type="button" aria-label="Purple"></button><button data-color="#111111" style="--swatch:#111111" type="button" aria-label="Black"></button></div>
           <div class="paint-actions"><button class="secondary-dark-button" id="paintEraser" type="button">Eraser</button><button class="secondary-dark-button" id="clearPaint" type="button">Clear</button><button class="primary-button" id="savePainting" type="button">Save to art show</button></div>
         </div>
         <div class="paint-canvas-wrap"><canvas id="paintCanvas" width="1200" height="720" aria-label="Finger painting canvas"></canvas></div>
