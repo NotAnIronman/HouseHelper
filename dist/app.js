@@ -3,7 +3,7 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
-const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.2.0";
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.3.0";
 
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -20,15 +20,106 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-const PROFILES = {
-  family: { name: "Family", shortRole: "Family view", avatar: "⌂", adult: false, rewardOwner: "harper" },
-  tyler: { name: "Tyler", shortRole: "Father · Adult", avatar: "T", adult: true, rewardOwner: "harper" },
-  rose: { name: "Rose", shortRole: "Mother · Adult", avatar: "R", adult: true, rewardOwner: "harper" },
-  harper: { name: "Harper", shortRole: "Daughter · Kid", avatar: "H", adult: false, rewardOwner: "harper" },
-  griffin: { name: "Griffin", shortRole: "Son · Kid", avatar: "G", adult: false, rewardOwner: "griffin" },
+const FAMILY_CONFIG_KEY = "hh-family-config";
+const PROFILE_COLORS = ["#2d6a5a", "#315c8a", "#80527f", "#b64f73", "#2d718d", "#9a5b34", "#5e6b42", "#6c57a0"];
+
+function safeMemberId(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function nameFromId(value) {
+  return String(value || "").split(/[-_]+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function findExistingMembers() {
+  const adults = new Set(Object.keys(readStoredObject("hh-parent-passcodes")));
+  const children = new Set(Object.keys(readStoredObject("hh-rewards")));
+  const known = new Set([...adults, ...children]);
+  const displayNames = new Map();
+  const addPerson = (value) => { if (value && value !== "family" && value !== "kids") known.add(String(value)); };
+  readStoredArray("hh-custom-chores", []).forEach((item) => { addPerson(item && item.person); addPerson(item && item.createdBy); });
+  readStoredArray("hh-habits", []).forEach((item) => addPerson(item && item.person));
+  readStoredArray("hh-events", []).forEach((item) => { addPerson(item && item.people); addPerson(item && item.createdBy); });
+  Object.values(readStoredObject("hh-chores")).forEach((record) => {
+    [record && record.approvedBy, record && record.returnedBy].filter(Boolean).forEach((name) => {
+      const id = safeMemberId(name);
+      if (!id) return;
+      known.add(id);
+      adults.add(id);
+      displayNames.set(id, String(name));
+    });
+  });
+  Object.keys(readStoredObject("hh-profile-themes")).forEach(addPerson);
+  Object.keys(readStoredObject("hh-layouts")).forEach(addPerson);
+  addPerson(localStorage.getItem("hh-profile"));
+  const members = [...known].map((id, index) => ({
+    id,
+    name: displayNames.get(id) || nameFromId(id),
+    role: adults.has(id) ? "Parent / caregiver" : children.has(id) ? "Child" : "Household member",
+    adult: adults.has(id),
+    color: PROFILE_COLORS[index % PROFILE_COLORS.length],
+  }));
+  if (!adults.size && members.length) members.unshift({ id: "adult-1", name: "", role: "Parent / caregiver", adult: true, color: PROFILE_COLORS[0] });
+  return members;
+}
+
+function normalizeFamilyConfig(value) {
+  if (!value || !Array.isArray(value.members)) return null;
+  const seen = new Set();
+  const members = value.members.filter((member) => member && String(member.name || "").trim()).map((member, index) => {
+    let id = safeMemberId(member.id) || "person-" + (index + 1);
+    while (seen.has(id) || id === "family" || id === "kids") id += "-member";
+    seen.add(id);
+    return {
+      id,
+      name: String(member.name).trim(),
+      role: String(member.role || (member.adult ? "Parent / caregiver" : "Child")).trim(),
+      adult: Boolean(member.adult),
+      color: /^#[0-9a-f]{6}$/i.test(member.color || "") ? member.color : PROFILE_COLORS[index % PROFILE_COLORS.length],
+    };
+  });
+  if (!members.length || !members.some((member) => member.adult)) return null;
+  return { familyName: String(value.familyName || "My Family").trim() || "My Family", members };
+}
+
+const storedFamilyConfig = normalizeFamilyConfig(readStoredObject(FAMILY_CONFIG_KEY));
+const detectedSetupMembers = storedFamilyConfig ? [] : findExistingMembers();
+const SETUP_REQUIRED = !storedFamilyConfig;
+const familyConfig = storedFamilyConfig || {
+  familyName: "My Family",
+  members: detectedSetupMembers.length ? detectedSetupMembers : [
+    { id: "adult-1", name: "Adult", role: "Parent / caregiver", adult: true, color: PROFILE_COLORS[0] },
+    { id: "child-1", name: "Child", role: "Child", adult: false, color: PROFILE_COLORS[1] },
+  ],
 };
 
-const VIEWS = ["home", "chores", "habits", "lists", "rewards", "calendar", "art", "settings"];
+function buildProfiles(config) {
+  const children = config.members.filter((member) => !member.adult);
+  const firstChild = children[0] && children[0].id;
+  const profiles = {
+    family: { name: config.familyName, shortRole: "Family view", avatar: "⌂", adult: false, rewardOwner: firstChild || null, color: "#14392f" },
+  };
+  config.members.forEach((member) => {
+    profiles[member.id] = {
+      name: member.name,
+      shortRole: member.role + (member.adult ? " · Adult" : " · Child"),
+      avatar: member.name.charAt(0).toUpperCase(),
+      adult: member.adult,
+      rewardOwner: member.adult ? firstChild || null : member.id,
+      color: member.color,
+    };
+  });
+  return profiles;
+}
+
+const PROFILES = buildProfiles(familyConfig);
+const adultIds = () => Object.keys(PROFILES).filter((id) => id !== "family" && PROFILES[id].adult);
+const childIds = () => Object.keys(PROFILES).filter((id) => id !== "family" && !PROFILES[id].adult);
+const isChildProfile = (id) => childIds().includes(id);
+const firstAdultId = () => adultIds()[0] || null;
+const firstChildId = () => childIds()[0] || null;
+
+const VIEWS = ["home", "chores", "habits", "lists", "rewards", "calendar", "art", "fun", "settings"];
 const WIDGETS = [
   { id: "rewards", name: "Reward radar", icon: "★", detail: "Kid reward progress" },
   { id: "chores", name: "Today’s chores", icon: "✓", detail: "Assigned work and approvals" },
@@ -51,22 +142,7 @@ const BASE_LAYOUT = [
   { id: "art", size: "half", visible: true },
 ];
 
-const DEFAULT_LAYOUTS = {
-  family: BASE_LAYOUT,
-  tyler: BASE_LAYOUT,
-  rose: BASE_LAYOUT,
-  harper: [
-    { id: "rewards", size: "half", visible: true },
-    { id: "art", size: "half", visible: true },
-    { id: "chores", size: "half", visible: true },
-    { id: "habits", size: "half", visible: true },
-    { id: "lists", size: "compact", visible: true },
-    { id: "attention", size: "compact", visible: true },
-    { id: "timer", size: "compact", visible: true },
-    { id: "calendar", size: "compact", visible: true },
-  ],
-  griffin: BASE_LAYOUT,
-};
+const DEFAULT_LAYOUTS = Object.fromEntries(Object.keys(PROFILES).map((id) => [id, clone(BASE_LAYOUT)]));
 
 function dateKey(date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
@@ -85,42 +161,14 @@ function datePlus(days) {
 }
 
 function makeId(prefix) {
-  return prefix + "-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(16).slice(2));
+  return prefix + "-" + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(16).slice(2));
 }
 
-const DEFAULT_CHORES = [
-  { id: "dishes", person: "harper", title: "Unload dishwasher", area: "Kitchen", points: 10, icon: "🍽️", initialStatus: "done", familyPriority: true, photoRequired: true },
-  { id: "room", person: "harper", title: "Tidy your room", area: "Bedroom", points: 20, icon: "🛏️", initialStatus: "ready", photoRequired: true },
-  { id: "table", person: "harper", title: "Set the dinner table", area: "Dining room", points: 15, icon: "🍴", initialStatus: "ready", photoRequired: true },
-  { id: "dog", person: "griffin", title: "Fill the dog bowls", area: "Pet care", points: 15, icon: "🐕", initialStatus: "ready", familyPriority: true, missedCount: 2, photoRequired: true },
-  { id: "schoolbag", person: "griffin", title: "Pack your school bag", area: "Entryway", points: 15, icon: "🎒", initialStatus: "ready", photoRequired: true },
-  { id: "toys", person: "griffin", title: "Put away the toys", area: "Play room", points: 20, icon: "🧩", initialStatus: "ready", photoRequired: true },
-  { id: "recycling", person: "tyler", title: "Take out recycling", area: "Garage", points: 0, icon: "♻️", initialStatus: "ready", familyPriority: true, overdueDays: 1, photoRequired: true },
-  { id: "calendar-check", person: "tyler", title: "Check tomorrow’s schedule", area: "Family", points: 0, icon: "📅", initialStatus: "ready", photoRequired: true },
-  { id: "plants", person: "rose", title: "Water the plants", area: "Living room", points: 0, icon: "🪴", initialStatus: "ready", familyPriority: true, photoRequired: true },
-  { id: "papers", person: "rose", title: "Sort school papers", area: "Family", points: 0, icon: "📚", initialStatus: "ready", overdueDays: 2, photoRequired: true },
-];
-
-const DEFAULT_REWARDS = {
-  harper: {
-    points: readStoredNumber("hh-points", 80),
-    items: [
-      { id: "harper-ice-cream", name: localStorage.getItem("hh-reward-name") || "Ice cream trip", cost: readStoredNumber("hh-reward-target", 120), emoji: "🍦" },
-      { id: "harper-movie", name: "Pick family movie", cost: 75, emoji: "🎬" },
-      { id: "harper-bedtime", name: "30 minutes later bedtime", cost: 60, emoji: "🌙" },
-    ],
-  },
-  griffin: {
-    points: 45,
-    items: [
-      { id: "griffin-dessert", name: "Choose Friday dessert", cost: 100, emoji: "🍰" },
-      { id: "griffin-lego", name: "Extra LEGO time", cost: 60, emoji: "🧱" },
-    ],
-  },
-};
+const DEFAULT_CHORES = [];
+const DEFAULT_REWARDS = Object.fromEntries(childIds().map((id) => [id, { points: 0, items: [] }]));
 
 function normalizeRewardAccount(id, stored) {
-  const base = clone(DEFAULT_REWARDS[id]);
+  const base = clone(DEFAULT_REWARDS[id] || { points: 0, items: [] });
   if (!stored || typeof stored !== "object") return base;
   const account = { points: Number.isFinite(Number(stored.points)) ? Math.max(0, Number(stored.points)) : base.points, items: [] };
   if (Array.isArray(stored.items)) {
@@ -134,41 +182,14 @@ function normalizeRewardAccount(id, stored) {
     account.items = clone(base.items);
     account.items[0] = { id: account.items[0].id, name: String(stored.name), cost: Math.max(10, Number(stored.target) || 10), emoji: String(stored.emoji || account.items[0].emoji) };
   }
-  if (!account.items.length) account.items = base.items;
   return account;
 }
 
-const DEFAULT_ARTWORKS = [
-  { id: "sample-happy", type: "css", className: "art-one", content: "MY\nHAPPY\nPLACE", title: "My Happy Place", artist: "Harper" },
-  { id: "sample-star", type: "css", className: "art-two", content: "★", title: "Bright Star", artist: "Griffin" },
-];
-
-const DEFAULT_EVENTS = [
-  { id: "event-soccer", title: "Soccer practice", people: "harper", location: "North field", date: datePlus(0), time: "16:00", source: "connected" },
-  { id: "event-dinner", title: "Family dinner", people: "family", location: "Home", date: datePlus(0), time: "18:30", source: "local" },
-  { id: "event-wind-down", title: "Wind-down time", people: "kids", location: "Calm mode at 9:00", date: datePlus(0), time: "20:30", source: "local" },
-  { id: "event-dropoff", title: "School drop-off", people: "kids", location: "School", date: datePlus(1), time: "08:00", source: "connected" },
-];
-
-const DEFAULT_HABITS = [
-  { id: "habit-harper-teeth", person: "harper", name: "Brush teeth", icon: "🪥", schedule: "daily", time: "19:30" },
-  { id: "habit-griffin-read", person: "griffin", name: "Read for 20 minutes", icon: "📚", schedule: "daily", time: "19:00" },
-  { id: "habit-rose-water", person: "rose", name: "Drink water", icon: "💧", schedule: "daily", time: "09:00" },
-  { id: "habit-tyler-move", person: "tyler", name: "Move for 20 minutes", icon: "🏃", schedule: "weekdays", time: "17:30" },
-];
-
-const DEFAULT_LIST_ITEMS = [
-  { id: "list-milk", text: "Milk", category: "groceries", completed: false, addedBy: "family", createdAt: new Date().toISOString() },
-  { id: "list-dog-food", text: "Dog food", category: "household", completed: false, addedBy: "family", createdAt: new Date().toISOString() },
-];
-
-const DEFAULT_PROFILE_THEMES = {
-  family: { color: "#14392f", font: "rounded", scale: "normal", decorations: true },
-  tyler: { color: "#203e63", font: "clean", scale: "normal", decorations: true },
-  rose: { color: "#5b365f", font: "rounded", scale: "normal", decorations: true },
-  harper: { color: "#78325c", font: "classic", scale: "large", decorations: true },
-  griffin: { color: "#174c69", font: "rounded", scale: "normal", decorations: true },
-};
+const DEFAULT_ARTWORKS = [];
+const DEFAULT_EVENTS = [];
+const DEFAULT_HABITS = [];
+const DEFAULT_LIST_ITEMS = [];
+const DEFAULT_PROFILE_THEMES = Object.fromEntries(Object.entries(PROFILES).map(([id, profile]) => [id, { color: profile.color || "#14392f", font: "rounded", scale: "normal", decorations: true }]));
 
 function normalizeSettings(stored, defaults) {
   return Object.assign({}, defaults, stored && typeof stored === "object" ? stored : {});
@@ -191,12 +212,9 @@ const initialView = location.hash.replace("#", "");
 const state = {
   profile: PROFILES[initialProfile] ? initialProfile : "family",
   view: VIEWS.includes(initialView) ? initialView : "home",
-  rewardOwner: "harper",
+  rewardOwner: firstChildId(),
   rewardDraftPoints: 0,
-  rewards: {
-    harper: normalizeRewardAccount("harper", storedRewards.harper),
-    griffin: normalizeRewardAccount("griffin", storedRewards.griffin),
-  },
+  rewards: Object.fromEntries(childIds().map((id) => [id, normalizeRewardAccount(id, storedRewards[id])])),
   rewardClaims: readStoredArray("hh-reward-claims", []),
   activeClaim: null,
   schedulingClaimId: null,
@@ -219,7 +237,7 @@ const state = {
   habitFilter: "all",
   listItems: readStoredArray("hh-shared-list", clone(DEFAULT_LIST_ITEMS)),
   listFilter: "all",
-  familyNote: localStorage.getItem("hh-family-note") || "Dinner together at 6:30 · Bring school forms to the counter.",
+  familyNote: localStorage.getItem("hh-family-note") || "",
   activity: readStoredArray("hh-activity", []),
   activityFilter: "all",
   vacationMode: legacyVacationMode,
@@ -248,7 +266,7 @@ const state = {
   photoUrl: null,
   idleDeadline: null,
   authContext: null,
-  authParent: "tyler",
+  authParent: firstAdultId(),
   authConfirming: false,
   pendingPasscodeHash: null,
   passcodes: readStoredObject("hh-parent-passcodes"),
@@ -256,6 +274,12 @@ const state = {
   paintErasing: false,
   paintDrawing: false,
   paintLast: null,
+  setupEditing: SETUP_REQUIRED,
+  learningSettings: normalizeSettings(readStoredObject("hh-learning-settings"), { language: "spanish", learned: {}, streakDates: [] }),
+  flashcardOffset: 0,
+  flashcardRevealed: false,
+  reactionGame: { status: "idle", startedAt: 0, timeoutId: null, best: readStoredNumber("hh-reaction-best", 0) },
+  memoryGame: { cards: [], first: null, lock: false, moves: 0, matches: 0 },
 };
 
 const elements = {
@@ -283,6 +307,7 @@ const elements = {
   activityDialog: $("#activityDialog"),
   backupDialog: $("#backupDialog"),
   connectedDevicesDialog: $("#connectedDevicesDialog"),
+  familySetupDialog: $("#familySetupDialog"),
   timerDisplay: $("#timerDisplay"),
   calmScreen: $("#calmScreen"),
   toast: $("#toast"),
@@ -340,9 +365,97 @@ function persistVacationSettings() { localStorage.setItem("hh-vacation-settings"
 function persistGoogleSettings() { localStorage.setItem("hh-google-calendar", JSON.stringify(state.googleSettings)); }
 function persistReminderSettings() { localStorage.setItem("hh-reminder-settings", JSON.stringify(state.reminderSettings)); }
 function persistTimer() { localStorage.setItem("hh-timer", JSON.stringify({ initialSeconds: state.timerInitial, remainingSeconds: state.timerSeconds, running: state.timerRunning, endsAt: state.timerEndsAt })); }
+function profileName(id) { return PROFILES[id] ? PROFILES[id].name : nameFromId(id) || "Former member"; }
 function allChores() { return DEFAULT_CHORES.concat(state.customChores).filter((chore) => !state.removedChoreIds.includes(chore.id)); }
-function currentReward() { return state.rewards[state.rewardOwner]; }
-function rewardOwnerName() { return PROFILES[state.rewardOwner].name; }
+function currentReward() { return state.rewards[state.rewardOwner] || { points: 0, items: [] }; }
+function rewardOwnerName() { return PROFILES[state.rewardOwner] ? PROFILES[state.rewardOwner].name : "Rewards"; }
+
+function optionMarkup(id, label) {
+  return '<option value="' + escapeHtml(id) + '">' + escapeHtml(label) + '</option>';
+}
+
+function renderMemberControls() {
+  const ids = Object.keys(PROFILES);
+  $(".profile-grid").innerHTML = ids.map((id) => {
+    const profile = PROFILES[id];
+    return '<button class="profile-option ' + (id === "family" ? "family" : "") + '" style="--option-color:' + profile.color + '" data-profile="' + escapeHtml(id) + '" type="button"><span class="profile-option-avatar">' + escapeHtml(profile.avatar) + '</span><span><strong>' + escapeHtml(profile.name) + '</strong><small>' + escapeHtml(id === "family" ? "Shared dashboard" : profile.shortRole) + '</small></span><span class="selected-check">✓</span></button>';
+  }).join("");
+
+  $("#parentPicker").innerHTML = adultIds().map((id, index) => '<button class="' + (index === 0 ? "active" : "") + '" data-parent="' + escapeHtml(id) + '" type="button"><span>' + escapeHtml(PROFILES[id].avatar) + '</span>' + escapeHtml(PROFILES[id].name) + '</button>').join("");
+  const memberOptions = familyConfig.members.map((member) => optionMarkup(member.id, member.name)).join("");
+  const allOptions = optionMarkup("family", "Everyone") + memberOptions;
+  $("#choreAssigneeInput").innerHTML = memberOptions;
+  $("#habitPersonInput").innerHTML = memberOptions;
+  $("#themeProfileInput").innerHTML = ids.map((id) => optionMarkup(id, id === "family" ? familyConfig.familyName + " (family view)" : PROFILES[id].name)).join("");
+  $("#googleOwnerInput").innerHTML = allOptions;
+  $("#eventPeopleInput").innerHTML = allOptions + (childIds().length > 1 ? optionMarkup("kids", "All children") : "");
+  $("#choreFilters").innerHTML = '<button class="active" data-chore-filter="all" type="button">Everyone</button>' + familyConfig.members.map((member) => '<button data-chore-filter="' + escapeHtml(member.id) + '" type="button">' + escapeHtml(member.name) + '</button>').join("");
+  $("#habitFilters").innerHTML = '<button class="active" data-habit-filter="all" type="button">Everyone</button>' + familyConfig.members.map((member) => '<button data-habit-filter="' + escapeHtml(member.id) + '" type="button">' + escapeHtml(member.name) + '</button>').join("");
+  $(".reward-kid-tabs").innerHTML = childIds().map((id, index) => '<button class="' + (index === 0 ? "active" : "") + '" data-reward-owner="' + escapeHtml(id) + '" type="button">' + escapeHtml(PROFILES[id].name) + '</button>').join("");
+  $("#familyMembersLabel").textContent = familyConfig.members.length + " member" + (familyConfig.members.length === 1 ? "" : "s") + " · names, roles, and colors";
+}
+
+function setupMemberMarkup(member, adult) {
+  const color = member && member.color || PROFILE_COLORS[Math.floor(Math.random() * PROFILE_COLORS.length)];
+  return '<div class="member-editor" data-member-id="' + escapeHtml(member && member.id || "") + '" data-adult="' + String(adult) + '"><input class="member-name" maxlength="32" placeholder="Name" aria-label="Member name" value="' + escapeHtml(member && member.name || "") + '" required><input class="member-role" maxlength="32" placeholder="' + (adult ? "Parent, grandparent, caregiver…" : "Child, teen…") + '" aria-label="Role" value="' + escapeHtml(member && member.role || (adult ? "Parent / caregiver" : "Child")) + '"><label class="member-color"><span>Color</span><input type="color" value="' + color + '" aria-label="Profile color"></label><button class="member-remove" type="button" aria-label="Remove member">×</button></div>';
+}
+
+function addSetupMember(adult, member) {
+  const target = adult ? $("#adultMemberEditors") : $("#childMemberEditors");
+  target.insertAdjacentHTML("beforeend", setupMemberMarkup(member || null, adult));
+  const input = target.lastElementChild && $(".member-name", target.lastElementChild);
+  if (input && state.setupEditing && !SETUP_REQUIRED) input.focus();
+}
+
+function openFamilySetup() {
+  state.setupEditing = true;
+  elements.familySetupDialog.dataset.firstRun = String(SETUP_REQUIRED);
+  $("#familySetupTitle").textContent = SETUP_REQUIRED ? "Set up your household" : "Edit household members";
+  $("#familySetupIntro").textContent = SETUP_REQUIRED && detectedSetupMembers.some((member) => member.name) ? "We found profiles from an earlier version on this device. Review these suggestions and add anyone missing; existing saved household content will be kept." : SETUP_REQUIRED ? "Create an adult profile for each parent, grandparent, or caregiver and a child profile for every child. Your dashboard will begin completely blank." : "Update names, roles, colors, or add new household members. Saved history remains on this device.";
+  $("#closeFamilySetupButton").hidden = SETUP_REQUIRED;
+  $("#familySetupError").textContent = "";
+  $("#familyNameInput").value = storedFamilyConfig ? familyConfig.familyName : "";
+  $("#adultMemberEditors").innerHTML = "";
+  $("#childMemberEditors").innerHTML = "";
+  const seed = storedFamilyConfig ? familyConfig.members : detectedSetupMembers;
+  const adults = seed.filter((member) => member.adult);
+  const children = seed.filter((member) => !member.adult);
+  (adults.length ? adults : [null]).forEach((member) => addSetupMember(true, member));
+  (children.length ? children : [null]).forEach((member) => addSetupMember(false, member));
+  if (!elements.familySetupDialog.open) elements.familySetupDialog.showModal();
+  setTimeout(() => $("#familyNameInput").focus(), 0);
+}
+
+function saveFamilySetup() {
+  const rows = $$(".member-editor", elements.familySetupDialog);
+  const usedIds = new Set(["family", "kids"]);
+  const members = rows.map((row, index) => {
+    const name = $(".member-name", row).value.trim();
+    if (!name) return null;
+    let id = safeMemberId(row.dataset.memberId) || safeMemberId(name) || "person-" + (index + 1);
+    while (usedIds.has(id)) id += "-" + (index + 1);
+    usedIds.add(id);
+    return {
+      id,
+      name,
+      role: $(".member-role", row).value.trim() || (row.dataset.adult === "true" ? "Parent / caregiver" : "Child"),
+      adult: row.dataset.adult === "true",
+      color: $('input[type="color"]', row).value,
+    };
+  }).filter(Boolean);
+  if (!members.some((member) => member.adult)) {
+    $("#familySetupError").textContent = "Add at least one adult or caregiver profile.";
+    return;
+  }
+  const config = normalizeFamilyConfig({ familyName: $("#familyNameInput").value.trim(), members });
+  if (!config) {
+    $("#familySetupError").textContent = "Add a household name and at least one adult.";
+    return;
+  }
+  localStorage.setItem(FAMILY_CONFIG_KEY, JSON.stringify(config));
+  showToast("Household saved · loading your private dashboard");
+  setTimeout(() => location.reload(), 400);
+}
 function choreStatus(chore) {
   const record = state.chores[chore.id] || {};
   if (chore.repeat && chore.repeat !== "none" && record.occurrenceDate !== datePlus(0)) return chore.initialStatus;
@@ -446,13 +559,13 @@ function choreMarkup(chore, showPerson, fullBoard) {
   const isDone = status === "done";
   const warning = warningFor(chore);
   const due = chore.dueDate ? "Due " + parseDateKey(chore.dueDate).toLocaleDateString([], { month: "short", day: "numeric" }) + (chore.dueTime ? " · " + formatTime(chore.dueTime) : "") : null;
-  const meta = [showPerson ? PROFILES[chore.person].name : null, chore.area, chore.points ? "+" + chore.points + " points" : null, repeatLabel(chore), due].filter(Boolean).join(" · ");
+  const meta = [showPerson ? profileName(chore.person) : null, chore.area, chore.points ? "+" + chore.points + " points" : null, repeatLabel(chore), due].filter(Boolean).join(" · ");
   let action = "";
   if (status === "ready" || status === "in-progress") {
     const actionName = status === "in-progress" ? "Finish" : "Start";
     action = '<button class="chore-action" type="button" aria-label="' + actionName + " " + escapeHtml(chore.title) + '"><svg><use href="#icon-camera"></use></svg><span>' + actionName + "</span></button>";
   } else if (status === "pending") {
-    action = '<span class="status-stack"><span class="status-badge pending">' + (canReviewFromCurrentView() ? "Review photos" : "Waiting for parent") + "</span></span>";
+    action = '<span class="status-stack"><span class="status-badge pending">' + (canReviewFromCurrentView() ? "Review photos" : "Waiting for an adult") + "</span></span>";
   } else {
     action = '<span class="status-stack"><span class="status-badge approved">' + (record.approvedBy ? "Approved" : "Completed") + "</span>" + (record.approvedBy ? '<span class="approval-by">by ' + escapeHtml(record.approvedBy) + "</span>" : "") + "</span>";
   }
@@ -467,7 +580,7 @@ function renderChores() {
   const chores = visibleHomeChores();
   const profileName = state.profile === "family" ? "Everyone" : PROFILES[state.profile].name;
   $("#choreOwnerLabel").textContent = "Today · " + profileName;
-  $("#choreList").innerHTML = chores.map((chore) => choreMarkup(chore, state.profile === "family" || PROFILES[state.profile].adult)).join("");
+  $("#choreList").innerHTML = chores.length ? chores.map((chore) => choreMarkup(chore, state.profile === "family" || PROFILES[state.profile].adult)).join("") : '<div class="empty-state compact"><strong>No chores for today</strong><span>An adult can add the first chore from the Chores page.</span></div>';
   const done = chores.filter((chore) => choreStatus(chore) === "done").length;
   $("#choreCount").textContent = done;
   $("#choreTotal").textContent = chores.length;
@@ -483,16 +596,17 @@ function filteredFullChores() {
 }
 
 function renderFullChores() {
-  $("#fullChoreList").innerHTML = filteredFullChores().map((chore) => choreMarkup(chore, true, true)).join("");
+  const filtered = filteredFullChores();
+  $("#fullChoreList").innerHTML = filtered.length ? filtered.map((chore) => choreMarkup(chore, true, true)).join("") : '<div class="empty-state"><strong>No chores yet</strong><span>Use “Add chore” to build a routine that fits your household.</span></div>';
   $$("[data-chore-filter]").forEach((button) => button.classList.toggle("active", button.dataset.choreFilter === state.choreFilter));
   const warnings = allChores().filter((chore) => warningFor(chore));
   $("#warningTitle").textContent = warnings.length + " " + (warnings.length === 1 ? "chore needs" : "chores need") + " attention";
-  $("#warningSummary").textContent = warnings.length ? warnings.map((chore) => PROFILES[chore.person].name + ": " + warningFor(chore).toLowerCase()).join(" · ") : "Everything is currently on track.";
+  $("#warningSummary").textContent = warnings.length ? warnings.map((chore) => profileName(chore.person) + ": " + warningFor(chore).toLowerCase()).join(" · ") : "Everything is currently on track.";
   $("#warningPanel").hidden = warnings.length === 0;
   const pending = allChores().filter((chore) => choreStatus(chore) === "pending");
   $("#reviewQueuePanel").hidden = !canReviewFromCurrentView() || pending.length === 0;
   $("#reviewQueueTitle").textContent = pending.length + " " + (pending.length === 1 ? "chore is" : "chores are") + " ready to review";
-  $("#reviewQueueSummary").textContent = pending.map((chore) => PROFILES[chore.person].name + ": " + chore.title).join(" · ");
+  $("#reviewQueueSummary").textContent = pending.map((chore) => profileName(chore.person) + ": " + chore.title).join(" · ");
 }
 
 function renderAttention() {
@@ -500,16 +614,16 @@ function renderAttention() {
   const items = visibleWarnings.filter((chore) => warningFor(chore)).slice(0, 3).map((chore) => ({
     icon: "!",
     title: chore.title,
-    detail: PROFILES[chore.person].name + " · " + warningFor(chore),
+    detail: profileName(chore.person) + " · " + warningFor(chore),
   }));
   if (PROFILES[state.profile].adult) {
     state.rewardClaims.filter((claim) => !claim.acknowledged).slice(0, 2).forEach((claim) => items.unshift({
       icon: "★",
-      title: PROFILES[claim.childId].name + " claimed " + claim.rewardName,
+      title: profileName(claim.childId) + " claimed " + claim.rewardName,
       detail: "Open Rewards to acknowledge or schedule it",
     }));
   }
-  $("#attentionTitle").textContent = state.profile === "harper" || state.profile === "griffin" ? "Your reminders" : "Household reminders";
+  $("#attentionTitle").textContent = isChildProfile(state.profile) ? "Your reminders" : "Household reminders";
   $("#attentionCount").textContent = items.length;
   $("#homeAttentionList").innerHTML = items.slice(0, 3).map((item) => '<div class="attention-item"><span>' + item.icon + '</span><div><strong>' + escapeHtml(item.title) + "</strong><small>" + escapeHtml(item.detail) + "</small></div></div>").join("") || '<div class="attention-item"><span>✓</span><div><strong>Everything is on track</strong><small>No overdue chores or new claims</small></div></div>';
   const alertCount = PROFILES[state.profile].adult ? state.rewardClaims.filter((claim) => !claim.acknowledged).length : 0;
@@ -521,6 +635,18 @@ function renderAttention() {
 }
 
 function renderRewards() {
+  if (!state.rewardOwner || !state.rewards[state.rewardOwner]) {
+    $("#rewardTitle").textContent = "Reward shop";
+    $("#pointCount").textContent = "0";
+    $("#dialogPoints").textContent = "0";
+    $("#homeRewardChoices").innerHTML = '<div class="empty-state compact"><strong>No child profiles yet</strong><span>Add a child in Household members to create a reward wallet.</span></div>';
+    $("#encouragement").textContent = "Each child gets a private, non-expiring points wallet.";
+    $("#manageRewardsButton").disabled = true;
+    renderRewardOverview();
+    renderClaimNotices();
+    return;
+  }
+  $("#manageRewardsButton").disabled = false;
   const account = currentReward();
   const owner = rewardOwnerName();
   const points = Math.max(0, Number(account.points) || 0);
@@ -533,7 +659,7 @@ function renderRewards() {
   $("#homeRewardChoices").innerHTML = account.items.slice(0, 3).map((reward) => {
     const affordable = points >= reward.cost;
     return '<button class="home-reward-choice ' + (affordable ? "affordable" : "") + '" data-claim-owner="' + state.rewardOwner + '" data-claim-reward="' + reward.id + '" type="button" ' + (canClaim ? "" : "disabled") + '><span>' + escapeHtml(reward.emoji) + '</span><span><strong>' + escapeHtml(reward.name) + "</strong><small>" + (affordable ? "Tap to buy" : reward.cost - points + " more needed") + "</small></span><b>" + reward.cost + "</b></button>";
-  }).join("");
+  }).join("") || '<div class="empty-state compact"><strong>No rewards yet</strong><span>An adult can add this child’s first reward.</span></div>';
   $("#encouragement").textContent = canClaim ? "Tap a reward to buy it. Your points only change after the second confirmation." : "Points are saved until they are spent and never expire.";
   $$("[data-reward-owner]").forEach((button) => button.classList.toggle("active", button.dataset.rewardOwner === state.rewardOwner));
   renderRewardOverview();
@@ -541,7 +667,11 @@ function renderRewards() {
 }
 
 function renderRewardOverview() {
-  const owners = state.profile === "harper" || state.profile === "griffin" ? [state.profile] : ["harper", "griffin"];
+  const owners = isChildProfile(state.profile) ? [state.profile] : childIds();
+  if (!owners.length) {
+    $("#rewardOverview").innerHTML = '<div class="empty-state"><strong>No reward wallets yet</strong><span>Add a child profile in Settings to begin.</span></div>';
+    return;
+  }
   $("#rewardOverview").innerHTML = owners.map((id) => {
     const account = state.rewards[id];
     const canClaim = state.profile === id;
@@ -549,7 +679,7 @@ function renderRewardOverview() {
       const affordable = account.points >= item.cost;
       return '<button class="reward-choice ' + (affordable ? "affordable" : "") + '" data-claim-owner="' + id + '" data-claim-reward="' + item.id + '" type="button" ' + (canClaim ? "" : "disabled") + '><span>' + escapeHtml(item.emoji) + '</span><span><strong>' + escapeHtml(item.name) + "</strong><small>" + (affordable ? "Ready to claim" : item.cost - account.points + " more points") + "</small></span><b>" + item.cost + " pts</b></button>";
     }).join("");
-    return '<article class="reward-person-card ' + id + '"><header><p class="eyebrow">' + PROFILES[id].name + '’s reward shop</p><span>' + PROFILES[id].avatar + '</span></header><div class="reward-card-top"><strong>' + account.points + '</strong><span>available points</span></div><div class="reward-choice-list">' + choices + '</div><footer><span>' + (canClaim ? "Tap a reward to buy it" : account.items.length + " reward choices") + '</span>' + (PROFILES[state.profile].adult ? '<button data-manage-reward="' + id + '" type="button">Manage</button>' : "") + "</footer></article>";
+    return '<article class="reward-person-card" style="--person-color:' + PROFILES[id].color + ';--person-accent:' + PROFILES[id].color + '44"><header><p class="eyebrow">' + escapeHtml(PROFILES[id].name) + '’s reward shop</p><span>' + PROFILES[id].avatar + '</span></header><div class="reward-card-top"><strong>' + account.points + '</strong><span>available points</span></div><div class="reward-choice-list">' + (choices || '<div class="empty-state compact"><strong>No rewards yet</strong><span>An adult can add reward choices here.</span></div>') + '</div><footer><span>' + (canClaim ? "Tap a reward to buy it" : account.items.length + " reward choices") + '</span>' + (PROFILES[state.profile].adult ? '<button data-manage-reward="' + id + '" type="button">Manage</button>' : "") + "</footer></article>";
   }).join("");
 }
 
@@ -561,7 +691,7 @@ function renderClaimNotices() {
     panel.innerHTML = "";
     return;
   }
-  panel.innerHTML = "<strong>New reward claims</strong><div class=\"claim-notice-list\">" + claims.map((claim) => '<div class="claim-notice"><span><strong>' + PROFILES[claim.childId].name + " claimed " + escapeHtml(claim.rewardName) + "</strong><small>" + new Date(claim.createdAt).toLocaleString() + (claim.scheduledEventId ? " · Scheduled" : "") + '</small></span><div>' + (!claim.scheduledEventId ? '<button data-schedule-claim="' + claim.id + '" type="button">Schedule</button>' : "") + '<button data-ack-claim="' + claim.id + '" type="button">Acknowledge</button></div></div>').join("") + "</div>";
+  panel.innerHTML = "<strong>New reward claims</strong><div class=\"claim-notice-list\">" + claims.map((claim) => '<div class="claim-notice"><span><strong>' + escapeHtml(profileName(claim.childId)) + " claimed " + escapeHtml(claim.rewardName) + "</strong><small>" + new Date(claim.createdAt).toLocaleString() + (claim.scheduledEventId ? " · Scheduled" : "") + '</small></span><div>' + (!claim.scheduledEventId ? '<button data-schedule-claim="' + claim.id + '" type="button">Schedule</button>' : "") + '<button data-ack-claim="' + claim.id + '" type="button">Acknowledge</button></div></div>').join("") + "</div>";
 }
 
 function renderDayScore() {
@@ -588,7 +718,7 @@ function formatTime(value) {
 
 function peopleLabel(value) {
   if (value === "family") return "Everyone";
-  if (value === "kids") return "Harper & Griffin";
+  if (value === "kids") return childIds().length ? childIds().map(profileName).join(" & ") : "Children";
   return PROFILES[value] ? PROFILES[value].name : value;
 }
 
@@ -717,7 +847,7 @@ function visibleHabits(fullBoard) {
     if (vacationIsActive() && state.vacationSettings.pauseHabits) return false;
     return isHabitScheduledOn(habit, new Date());
   });
-  if (state.profile === "harper" || state.profile === "griffin") habits = habits.filter((habit) => habit.person === state.profile);
+  if (isChildProfile(state.profile)) habits = habits.filter((habit) => habit.person === state.profile);
   else if (!fullBoard && state.profile !== "family") habits = habits.filter((habit) => habit.person === state.profile);
   if (fullBoard && state.habitFilter !== "all") habits = habits.filter((habit) => habit.person === state.habitFilter);
   return habits;
@@ -727,7 +857,7 @@ function habitMarkup(habit, fullBoard) {
   const done = habitDoneToday(habit);
   const streak = habitStreak(habit);
   const canDelete = fullBoard && (PROFILES[state.profile].adult || state.profile === "family");
-  return '<article class="habit-row' + (done ? " done" : "") + '" data-habit-id="' + habit.id + '"><button class="habit-check" data-toggle-habit="' + habit.id + '" type="button" aria-label="' + (done ? "Undo " : "Complete ") + escapeHtml(habit.name) + '">' + (done ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="habit-icon">' + escapeHtml(habit.icon) + '</span><span class="habit-copy"><strong>' + escapeHtml(habit.name) + '</strong><small>' + escapeHtml(PROFILES[habit.person].name + " · " + (habit.schedule === "daily" ? "Every day" : habit.schedule === "weekdays" ? "Weekdays" : "Weekends") + (habit.time ? " · " + formatTime(habit.time) : "")) + '</small></span><span class="habit-streak"><b>' + streak + '</b><small>day streak</small></span>' + (canDelete ? '<button class="row-delete" data-delete-habit="' + habit.id + '" type="button" aria-label="Delete ' + escapeHtml(habit.name) + '">×</button>' : "") + '</article>';
+  return '<article class="habit-row' + (done ? " done" : "") + '" data-habit-id="' + habit.id + '"><button class="habit-check" data-toggle-habit="' + habit.id + '" type="button" aria-label="' + (done ? "Undo " : "Complete ") + escapeHtml(habit.name) + '">' + (done ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="habit-icon">' + escapeHtml(habit.icon) + '</span><span class="habit-copy"><strong>' + escapeHtml(habit.name) + '</strong><small>' + escapeHtml(profileName(habit.person) + " · " + (habit.schedule === "daily" ? "Every day" : habit.schedule === "weekdays" ? "Weekdays" : "Weekends") + (habit.time ? " · " + formatTime(habit.time) : "")) + '</small></span><span class="habit-streak"><b>' + streak + '</b><small>day streak</small></span>' + (canDelete ? '<button class="row-delete" data-delete-habit="' + habit.id + '" type="button" aria-label="Delete ' + escapeHtml(habit.name) + '">×</button>' : "") + '</article>';
 }
 
 function renderHabits() {
@@ -739,7 +869,7 @@ function renderHabits() {
   $("#habitBoard").innerHTML = fullHabits.length ? fullHabits.map((habit) => habitMarkup(habit, true)).join("") : '<div class="empty-state"><strong>No habits here yet</strong><span>Tap “Add habit” to build a gentle family routine.</span></div>';
   $$('[data-habit-filter]').forEach((button) => {
     button.classList.toggle("active", button.dataset.habitFilter === state.habitFilter);
-    button.hidden = (state.profile === "harper" || state.profile === "griffin") && button.dataset.habitFilter !== state.profile;
+    button.hidden = isChildProfile(state.profile) && button.dataset.habitFilter !== state.profile;
   });
   $("#vacationBanner").hidden = !state.vacationMode;
   $("#vacationBanner small").textContent = state.vacationSettings.pauseHabits ? "Repeating chores and Home habit expectations are paused." : "Repeating chores are paused. Habits can still be checked voluntarily.";
@@ -915,7 +1045,7 @@ function saveConnectedDeviceName() {
 function toggleHabit(habitId) {
   const habit = state.habits.find((item) => item.id === habitId);
   if (!habit) return;
-  if ((state.profile === "harper" || state.profile === "griffin") && habit.person !== state.profile) return;
+  if (isChildProfile(state.profile) && habit.person !== state.profile) return;
   const today = datePlus(0);
   const dates = habitDates(habitId).slice();
   const index = dates.indexOf(today);
@@ -923,7 +1053,7 @@ function toggleHabit(habitId) {
   else dates.push(today);
   state.habitCompletions[habitId] = dates.slice(-400);
   persistHabitCompletions();
-  logActivity((index >= 0 ? "Unchecked " : "Completed ") + habit.name + " for " + PROFILES[habit.person].name, habit.icon);
+  logActivity((index >= 0 ? "Unchecked " : "Completed ") + habit.name + " for " + profileName(habit.person), habit.icon);
   renderHabits();
   showToast(index >= 0 ? "Habit reopened" : "Nice work — habit complete!");
 }
@@ -1365,6 +1495,70 @@ async function restoreBackup(file) {
   }
 }
 
+const FLASHCARD_DECKS = {
+  spanish: { label: "Spanish", voice: "es-ES", cards: [["Hello", "Hola", "OH-lah"], ["Thank you", "Gracias", "GRAH-syahs"], ["Please", "Por favor", "por fah-VOR"], ["Family", "Familia", "fah-MEE-lyah"], ["Good morning", "Buenos días", "BWEH-nohs DEE-ahs"], ["Water", "Agua", "AH-gwah"], ["Friend", "Amigo", "ah-MEE-goh"], ["I love you", "Te quiero", "teh KYEH-roh"]] },
+  french: { label: "French", voice: "fr-FR", cards: [["Hello", "Bonjour", "bohn-ZHOOR"], ["Thank you", "Merci", "mehr-SEE"], ["Please", "S’il vous plaît", "seel voo PLEH"], ["Family", "Famille", "fah-MEE"], ["Good evening", "Bonsoir", "bohn-SWAHR"], ["Water", "Eau", "oh"], ["Friend", "Ami", "ah-MEE"], ["See you soon", "À bientôt", "ah byan-TOH"]] },
+  japanese: { label: "Japanese", voice: "ja-JP", cards: [["Hello", "こんにちは · Konnichiwa", "kohn-nee-chee-wah"], ["Thank you", "ありがとう · Arigatō", "ah-ree-gah-toh"], ["Please", "お願いします · Onegaishimasu", "oh-neh-guy-shee-mahs"], ["Family", "家族 · Kazoku", "kah-zoh-koo"], ["Good morning", "おはよう · Ohayō", "oh-hah-yoh"], ["Water", "水 · Mizu", "mee-zoo"], ["Friend", "友達 · Tomodachi", "toh-moh-dah-chee"], ["Good night", "おやすみ · Oyasumi", "oh-yah-soo-mee"]] },
+};
+
+function currentFlashcard() {
+  const deck = FLASHCARD_DECKS[state.learningSettings.language] || FLASHCARD_DECKS.spanish;
+  const seed = Number(datePlus(0).replace(/-/g, ""));
+  const index = (seed + state.flashcardOffset) % deck.cards.length;
+  return { deck, index, card: deck.cards[index], key: state.learningSettings.language + ":" + index };
+}
+
+function persistLearning() { localStorage.setItem("hh-learning-settings", JSON.stringify(state.learningSettings)); }
+
+function renderFlashcard() {
+  const current = currentFlashcard();
+  $("#learningLanguage").value = state.learningSettings.language;
+  $("#flashcardHeading").textContent = "Today’s " + current.deck.label + " word";
+  $("#flashcardPrompt").textContent = current.card[0];
+  $("#flashcardAnswer").textContent = state.flashcardRevealed ? current.card[1] : "Tap to reveal";
+  $("#flashcardPronunciation").textContent = state.flashcardRevealed ? current.card[2] : "";
+  $("#flashcard").classList.toggle("revealed", state.flashcardRevealed);
+  $("#hearFlashcardButton").disabled = !state.flashcardRevealed || !("speechSynthesis" in window);
+  const learnedKeys = Object.keys(state.learningSettings.learned || {}).filter((key) => key.startsWith(state.learningSettings.language + ":"));
+  const learned = Boolean(state.learningSettings.learned && state.learningSettings.learned[current.key]);
+  $("#learnedFlashcardButton").textContent = learned ? "✓ Learned" : "I learned this";
+  $("#learnedFlashcardButton").classList.toggle("is-learned", learned);
+  $("#learningProgress").textContent = learnedKeys.length + " of " + current.deck.cards.length + " " + current.deck.label + " words learned on this device";
+}
+
+function createMemoryGame() {
+  const icons = ["🌟", "🌈", "🍉", "🚀", "🐳", "🎨"];
+  state.memoryGame = {
+    cards: icons.concat(icons).map((icon, index) => ({ id: index + "-" + icon, icon, open: false, matched: false })).sort(() => Math.random() - 0.5),
+    first: null,
+    lock: false,
+    moves: 0,
+    matches: 0,
+  };
+  renderMemoryGame();
+}
+
+function renderMemoryGame() {
+  if (!state.memoryGame.cards.length) return createMemoryGame();
+  $("#memoryBoard").innerHTML = state.memoryGame.cards.map((card, index) => '<button class="memory-tile ' + (card.open || card.matched ? "open" : "") + (card.matched ? " matched" : "") + '" data-memory-index="' + index + '" type="button" aria-label="' + (card.open || card.matched ? card.icon : "Hidden card") + '"><span>' + (card.open || card.matched ? card.icon : "?") + '</span></button>').join("");
+  $("#memoryStatus").textContent = state.memoryGame.matches === 6 ? "All matched in " + state.memoryGame.moves + " moves!" : state.memoryGame.moves + " move" + (state.memoryGame.moves === 1 ? "" : "s") + " · " + state.memoryGame.matches + " of 6 pairs";
+}
+
+function renderReactionGame() {
+  const game = state.reactionGame;
+  $("#reactionPad").className = "reaction-pad " + game.status;
+  const copy = game.status === "waiting" ? ["Wait…", "Tap only when it turns green"] : game.status === "ready" ? ["TAP!", "Go, go, go!"] : game.status === "result" ? [game.last + " ms", "Tap to play again"] : ["Start", "Tap to play"];
+  $("#reactionPad strong").textContent = copy[0];
+  $("#reactionMessage").textContent = copy[1];
+  $("#reactionBest").textContent = game.best ? "Best time: " + game.best + " ms" : "No best time yet";
+}
+
+function renderFun() {
+  renderFlashcard();
+  renderReactionGame();
+  renderMemoryGame();
+}
+
 function renderAll() {
   refreshVacationState();
   setDateLabels();
@@ -1380,6 +1574,7 @@ function renderAll() {
   renderVacationMode();
   renderConnection();
   renderSettingsSummary();
+  renderFun();
   applyHomeLayout();
 }
 
@@ -1415,13 +1610,13 @@ function selectProfile(profileId, options) {
   options = options || {};
   if (!PROFILES[profileId]) return;
   state.profile = profileId;
-  state.rewardOwner = PROFILES[profileId].rewardOwner;
+  state.rewardOwner = PROFILES[profileId].rewardOwner || firstChildId();
   state.choreFilter = profileId === "family" ? "all" : profileId;
   state.habitFilter = profileId === "family" ? "all" : profileId;
   localStorage.setItem("hh-profile", profileId);
   const profile = PROFILES[profileId];
   document.body.dataset.profile = profileId;
-  document.body.classList.toggle("kid-view", !profile.adult);
+  document.body.classList.toggle("kid-view", profileId !== "family" && !profile.adult);
   applyProfileTheme(profileId);
   $(".profile-switch .avatar").textContent = profile.avatar;
   $(".profile-copy strong").textContent = profile.name;
@@ -1454,6 +1649,7 @@ function navigateTo(viewId, options) {
   }
   if (viewId === "calendar") renderCalendar();
   if (viewId === "art") renderArt();
+  if (viewId === "fun") renderFun();
   resetIdleDeadline();
   updateIdleCountdown();
   if (!options.quiet && viewId !== "home") showToast(viewId[0].toUpperCase() + viewId.slice(1) + " opened");
@@ -1514,7 +1710,7 @@ function openPhotoDialog(item) {
   const finishing = item.dataset.state === "in-progress";
   const name = $(".chore-copy strong", item).textContent;
   $("#photoTitle").textContent = (finishing ? "Add an after" : "Add a before") + " photo";
-  $("#photoHelp").textContent = finishing ? "Show the finished result for “" + name + ".” Points stay pending until a parent reviews both photos." : "Take a quick picture before starting “" + name + ".” A parent will compare it with the finished result.";
+  $("#photoHelp").textContent = finishing ? "Show the finished result for “" + name + ".” Points stay pending until an adult reviews both photos." : "Take a quick picture before starting “" + name + ".” An adult will compare it with the finished result.";
   $("#chorePhoto").value = "";
   $("#photoPreview").removeAttribute("src");
   $("#photoDrop").classList.remove("has-image");
@@ -1542,7 +1738,7 @@ async function completePhotoStep(withPhoto) {
     record.status = "pending";
     record.submittedAt = new Date().toISOString();
     record.pointsAwarded = false;
-    showToast("Submitted for parent approval — points are pending");
+    showToast("Submitted for adult approval — points are pending");
   } else {
     record.status = "in-progress";
     showToast("Before photo saved — you’ve got this!");
@@ -1578,17 +1774,17 @@ async function openChoreDetail(choreId) {
   state.detailChoreId = choreId;
   state.detailUrls.forEach((url) => URL.revokeObjectURL(url));
   state.detailUrls = [];
-  $("#detailPerson").textContent = PROFILES[chore.person].name + " · " + chore.area;
+  $("#detailPerson").textContent = profileName(chore.person) + " · " + chore.area;
   $("#detailTitle").textContent = chore.title;
-  const statusText = status === "pending" ? "Waiting for parent approval · " + (chore.points ? "+" + chore.points + " points pending" : "review needed") : record.approvedBy ? "Approved by " + record.approvedBy : "Completed before photo approvals were enabled";
+  const statusText = status === "pending" ? "Waiting for adult approval · " + (chore.points ? "+" + chore.points + " points pending" : "review needed") : record.approvedBy ? "Approved by " + record.approvedBy : "Completed before photo approvals were enabled";
   $("#detailStatus").innerHTML = '<span class="status-badge ' + (status === "pending" ? "pending" : "approved") + '">' + escapeHtml(statusText) + "</span>";
   const evidenceRequired = chore.photoRequired !== false || chore.points > 0;
-  $("#approvalRecord").innerHTML = record.approvedBy ? "<strong>Checked by " + escapeHtml(record.approvedBy) + "</strong><br>" + new Date(record.approvedAt).toLocaleString() : status === "pending" ? evidenceRequired ? "Both photos must be present before points can be approved." : "This chore does not require photo evidence, but a parent still confirms completion." : "No parent verification record is available for this earlier sample chore.";
+  $("#approvalRecord").innerHTML = record.approvedBy ? "<strong>Checked by " + escapeHtml(record.approvedBy) + "</strong><br>" + new Date(record.approvedAt).toLocaleString() : status === "pending" ? evidenceRequired ? "Both photos must be present before points can be approved." : "This chore does not require photo evidence, but an adult still confirms completion." : "No adult verification record is available for this completed chore.";
   const canReview = status === "pending" && canReviewFromCurrentView();
   $("#detailActions").hidden = !canReview;
   const evidenceReady = !evidenceRequired || record.beforePhoto && record.afterPhoto;
   $("#approveChoreButton").disabled = !evidenceReady;
-  $("#approveChoreButton").textContent = evidenceReady ? PROFILES[state.profile].adult ? "Approve as " + PROFILES[state.profile].name : "Verify parent & approve" : "Both photos required";
+  $("#approveChoreButton").textContent = evidenceReady ? PROFILES[state.profile].adult ? "Approve as " + PROFILES[state.profile].name : "Verify adult & approve" : "Both photos required";
   elements.choreDetailDialog.showModal();
   try {
     const evidence = await Promise.all([getEvidence(choreId + ":before"), getEvidence(choreId + ":after")]);
@@ -1662,7 +1858,7 @@ function refreshPasscodeCopy() {
   const parent = PROFILES[state.authParent];
   const creating = !state.passcodes[state.authParent];
   $("#passcodeTitle").textContent = state.authConfirming ? "Confirm " + parent.name + "’s passcode" : creating ? "Create " + parent.name + "’s passcode" : "Enter " + parent.name + "’s passcode";
-  $("#passcodeHelp").textContent = state.authConfirming ? "Enter the same four digits again to confirm." : creating ? "This parent does not have a household passcode yet. Choose four digits, then confirm them." : "Verify " + parent.name + " before continuing.";
+  $("#passcodeHelp").textContent = state.authConfirming ? "Enter the same four digits again to confirm." : creating ? "This adult does not have a household passcode yet. Choose four digits, then confirm them." : "Verify " + parent.name + " before continuing.";
   $("#unlockButton").textContent = authSubmitting ? "Checking…" : state.authConfirming ? "Confirm & continue" : "Continue";
   $("#unlockButton").disabled = authSubmitting;
   $("#passcodeBuildLabel").textContent = "HouseHelper " + localBuildVersion();
@@ -1674,7 +1870,8 @@ function refreshPasscodeCopy() {
 
 function requestParentAuth(context) {
   state.authContext = context;
-  state.authParent = context.parentId || (PROFILES[state.profile].adult ? state.profile : "tyler");
+  state.authParent = context.parentId || (PROFILES[state.profile].adult ? state.profile : firstAdultId());
+  if (!state.authParent) return showToast("Add an adult profile before using adult controls");
   state.authConfirming = false;
   state.pendingPasscodeHash = null;
   authSubmitting = false;
@@ -1746,6 +1943,7 @@ async function submitParentAuth() {
       if (context.itemType === "habit") removeHabit(context.itemId, parentId);
       if (context.itemType === "list") removeListItem(context.itemId, parentId);
       if (context.itemType === "event") removeCalendarEvent(context.itemId, parentId);
+      if (context.itemType === "art") removeArtwork(context.itemId);
     }
     if (context.action === "vacation") openVacationSettings(parentId);
     if (context.action === "sleep") openSleepSettings(parentId);
@@ -1753,6 +1951,9 @@ async function submitParentAuth() {
     if (context.action === "activity") openActivity(parentId);
     if (context.action === "backup") openBackup();
     if (context.action === "devices") openConnectedDevices();
+    if (context.action === "familySetup") openFamilySetup();
+    if (context.action === "addChore") openChoreForm(true);
+    if (context.action === "manageRewards") openRewardManager(context.rewardOwner, true);
   } catch (error) {
     $("#passcodeError").textContent = "Passcode verification could not finish. Please try again.";
     input.focus();
@@ -1782,7 +1983,7 @@ async function approveChore(parentId) {
   }
   state.chores[chore.id] = record;
   persistChores();
-  logActivity(PROFILES[parentId].name + " approved “" + chore.title + "” for " + PROFILES[chore.person].name + (chore.points ? " (+" + chore.points + " points)" : ""), "✓");
+  logActivity(PROFILES[parentId].name + " approved “" + chore.title + "” for " + profileName(chore.person) + (chore.points ? " (+" + chore.points + " points)" : ""), "✓");
   renderAll();
   await openChoreDetail(chore.id);
   showToast("Approved by " + record.approvedBy + (chore.points ? " · +" + chore.points + " points" : ""));
@@ -1918,10 +2119,10 @@ function toggleArtworkArchive() {
   showToast(piece.archived ? "Artwork moved to the archive" : "Artwork restored to the show");
 }
 
-function openChoreForm() {
-  if (!PROFILES[state.profile].adult) return;
+function openChoreForm(authorized) {
+  if (!PROFILES[state.profile].adult && !authorized) return;
   $("#choreForm").reset();
-  $("#choreAssigneeInput").value = state.profile;
+  $("#choreAssigneeInput").value = state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
   $("#choreDueDateInput").value = datePlus(0);
   $("#choreDueTimeInput").value = "18:00";
   $("#chorePointsInput").value = "10";
@@ -1931,8 +2132,9 @@ function openChoreForm() {
   setTimeout(() => $("#choreTitleInput").focus(), 0);
 }
 
-function openRewardManager(owner) {
-  if (!PROFILES[state.profile].adult) return;
+function openRewardManager(owner, authorized) {
+  if (!PROFILES[state.profile].adult && !authorized) return;
+  if (!owner || !state.rewards[owner]) return showToast("Add a child profile before creating rewards");
   state.rewardOwner = owner;
   state.rewardDraftPoints = currentReward().points;
   $("#dialogPoints").textContent = state.rewardDraftPoints;
@@ -1975,13 +2177,13 @@ function renderRewardClaim() {
   } else if (active.step === 2) {
     $("#claimEyebrow").textContent = "Final confirmation";
     $("#claimTitle").textContent = "Use " + item.cost + " points?";
-    $("#claimBody").innerHTML = '<div class="claim-hero"><span>' + escapeHtml(item.emoji) + "</span><strong>One more tap</strong><p>Your balance will change from " + account.points + " to " + (account.points - item.cost) + " points. A parent will be notified.</p></div>";
+    $("#claimBody").innerHTML = '<div class="claim-hero"><span>' + escapeHtml(item.emoji) + "</span><strong>One more tap</strong><p>Your balance will change from " + account.points + " to " + (account.points - item.cost) + " points. The household adults will be notified.</p></div>";
     $("#confirmClaimButton").disabled = false;
     $("#confirmClaimButton").textContent = "Buy for " + item.cost + " points";
   } else {
     $("#claimEyebrow").textContent = "Reward claimed";
     $("#claimTitle").textContent = "Nice work!";
-    $("#claimBody").innerHTML = '<div class="claim-hero success"><span>🎉</span><strong>' + escapeHtml(item.name) + "</strong><p>Tyler and Rose will see this claim. You can also put it on the family calendar now.</p></div>";
+    $("#claimBody").innerHTML = '<div class="claim-hero success"><span>🎉</span><strong>' + escapeHtml(item.name) + "</strong><p>The household adults will see this claim. You can also put it on the family calendar now.</p></div>";
   }
 }
 
@@ -1997,7 +2199,7 @@ function finishRewardClaim() {
   active.step = 3;
   persistRewards();
   persistClaims();
-  logActivity(PROFILES[active.owner].name + " claimed “" + item.name + "” for " + item.cost + " points", "★");
+  logActivity(profileName(active.owner) + " claimed “" + item.name + "” for " + item.cost + " points", "★");
   renderAll();
   renderRewardClaim();
   showToast(item.name + " claimed · " + item.cost + " points used");
@@ -2019,7 +2221,7 @@ function openEventDialog(prefill) {
   $("#saveEventButton").hidden = readOnly;
   $("#deleteEventButton").hidden = !existing || readOnly;
   ["#eventNameInput", "#eventPeopleInput", "#eventLocationInput", "#eventDateInput", "#eventTimeInput"].forEach((selector) => $(selector).disabled = readOnly);
-  $("#eventSourceNote").textContent = readOnly ? "This event is a read-only copy from " + (existing.sourceName || "Google Calendar") + ". Sync again after changing it in Google." : "Everyone—including Harper and Griffin—can add family calendar items. Connected calendars appear beside these dashboard-created events.";
+  $("#eventSourceNote").textContent = readOnly ? "This event is a read-only copy from " + (existing.sourceName || "Google Calendar") + ". Sync again after changing it in Google." : "Everyone can add family calendar items. Connected calendars appear beside dashboard-created events.";
   $("#openGoogleEventLink").hidden = !readOnly || !existing.htmlLink;
   $("#openGoogleEventLink").href = readOnly && existing.htmlLink ? existing.htmlLink : "";
   state.editingEventId = existing ? existing.id : null;
@@ -2031,7 +2233,7 @@ function openEventDialog(prefill) {
 function scheduleClaim(claimId) {
   const claim = state.rewardClaims.find((item) => item.id === claimId);
   if (!claim) return;
-  openEventDialog({ title: PROFILES[claim.childId].name + ": " + claim.rewardName, people: claim.childId, claimId: claim.id });
+  openEventDialog({ title: profileName(claim.childId) + ": " + claim.rewardName, people: PROFILES[claim.childId] ? claim.childId : "family", claimId: claim.id });
 }
 
 function acknowledgeClaim(claimId) {
@@ -2039,7 +2241,7 @@ function acknowledgeClaim(claimId) {
   if (!claim) return;
   claim.acknowledged = true;
   persistClaims();
-  logActivity("Acknowledged " + PROFILES[claim.childId].name + "’s reward claim", "★");
+  logActivity("Acknowledged " + profileName(claim.childId) + "’s reward claim", "★");
   renderAll();
   showToast("Reward claim acknowledged");
 }
@@ -2242,7 +2444,7 @@ async function calmBeforeAfterSlides() {
     const beforeUrl = URL.createObjectURL(blobs[0]);
     const afterUrl = URL.createObjectURL(blobs[1]);
     calmObjectUrls.push(beforeUrl, afterUrl);
-    slides.push('<span class="calm-slide calm-before-after"><span><img src="' + beforeUrl + '" alt=""><b>Before</b></span><span><img src="' + afterUrl + '" alt=""><b>After</b></span><span class="calm-caption">' + escapeHtml(PROFILES[chore.person].name + " · " + chore.title) + "</span></span>");
+    slides.push('<span class="calm-slide calm-before-after"><span><img src="' + beforeUrl + '" alt=""><b>Before</b></span><span><img src="' + afterUrl + '" alt=""><b>After</b></span><span class="calm-caption">' + escapeHtml(profileName(chore.person) + " · " + chore.title) + "</span></span>");
   }
   return slides;
 }
@@ -2374,6 +2576,121 @@ function checkSleepSchedule() {
   if (!windowKey && state.calmAutomatic && elements.calmScreen.classList.contains("active")) leaveCalmMode({ automatic: true });
 }
 
+$("#addAdultMemberButton").addEventListener("click", () => addSetupMember(true));
+$("#addChildMemberButton").addEventListener("click", () => addSetupMember(false));
+elements.familySetupDialog.addEventListener("click", (event) => {
+  const remove = event.target.closest(".member-remove");
+  if (!remove) return;
+  const row = remove.closest(".member-editor");
+  const adultRows = $$('.member-editor[data-adult="true"]', elements.familySetupDialog);
+  if (row.dataset.adult === "true" && adultRows.length === 1) return showToast("Every household needs at least one adult profile");
+  row.remove();
+});
+elements.familySetupDialog.addEventListener("cancel", (event) => {
+  if (SETUP_REQUIRED) event.preventDefault();
+});
+$("#familySetupForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveFamilySetup();
+});
+$("#closeFamilySetupButton").addEventListener("click", () => {
+  if (!SETUP_REQUIRED) elements.familySetupDialog.close();
+});
+
+$("#learningLanguage").addEventListener("change", (event) => {
+  state.learningSettings.language = event.target.value;
+  state.flashcardOffset = 0;
+  state.flashcardRevealed = false;
+  persistLearning();
+  renderFlashcard();
+});
+$("#flashcard").addEventListener("click", () => {
+  state.flashcardRevealed = !state.flashcardRevealed;
+  renderFlashcard();
+});
+$("#nextFlashcardButton").addEventListener("click", () => {
+  state.flashcardOffset += 1;
+  state.flashcardRevealed = false;
+  renderFlashcard();
+});
+$("#learnedFlashcardButton").addEventListener("click", () => {
+  const current = currentFlashcard();
+  state.learningSettings.learned = state.learningSettings.learned || {};
+  state.learningSettings.learned[current.key] = new Date().toISOString();
+  const today = datePlus(0);
+  state.learningSettings.streakDates = [...new Set((state.learningSettings.streakDates || []).concat(today))].slice(-365);
+  persistLearning();
+  renderFlashcard();
+  showToast("Great job — this word is marked learned!");
+});
+$("#hearFlashcardButton").addEventListener("click", () => {
+  const current = currentFlashcard();
+  if (!state.flashcardRevealed || !("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(current.card[1].split(" · ")[0]);
+  utterance.lang = current.deck.voice;
+  speechSynthesis.speak(utterance);
+});
+$("#reactionPad").addEventListener("click", () => {
+  const game = state.reactionGame;
+  if (game.status === "waiting") {
+    clearTimeout(game.timeoutId);
+    game.status = "idle";
+    renderReactionGame();
+    showToast("Too soon — wait for green!");
+    return;
+  }
+  if (game.status === "ready") {
+    game.last = Math.max(1, Date.now() - game.startedAt);
+    game.best = game.best ? Math.min(game.best, game.last) : game.last;
+    localStorage.setItem("hh-reaction-best", String(game.best));
+    game.status = "result";
+    renderReactionGame();
+    return;
+  }
+  game.status = "waiting";
+  renderReactionGame();
+  game.timeoutId = setTimeout(() => {
+    game.status = "ready";
+    game.startedAt = Date.now();
+    renderReactionGame();
+  }, 1000 + Math.random() * 2200);
+});
+$("#resetMemoryButton").addEventListener("click", createMemoryGame);
+$("#memoryBoard").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-memory-index]");
+  if (!button || state.memoryGame.lock) return;
+  const index = Number(button.dataset.memoryIndex);
+  const card = state.memoryGame.cards[index];
+  if (!card || card.open || card.matched) return;
+  card.open = true;
+  if (state.memoryGame.first === null) {
+    state.memoryGame.first = index;
+    renderMemoryGame();
+    return;
+  }
+  const firstIndex = state.memoryGame.first;
+  const first = state.memoryGame.cards[firstIndex];
+  state.memoryGame.first = null;
+  state.memoryGame.moves += 1;
+  if (first.icon === card.icon) {
+    first.matched = true;
+    card.matched = true;
+    state.memoryGame.matches += 1;
+    renderMemoryGame();
+    if (state.memoryGame.matches === 6) showToast("You matched every pair!");
+    return;
+  }
+  state.memoryGame.lock = true;
+  renderMemoryGame();
+  setTimeout(() => {
+    first.open = false;
+    card.open = false;
+    state.memoryGame.lock = false;
+    renderMemoryGame();
+  }, 700);
+});
+
 elements.profileSwitch.addEventListener("click", () => elements.profileDialog.showModal());
 $(".profile-grid").addEventListener("click", (event) => {
   const option = event.target.closest(".profile-option");
@@ -2409,7 +2726,10 @@ $("#unlockButton").addEventListener("click", submitParentAuth);
 $("#closePasscodeButton").addEventListener("click", closeParentAuth);
 $("#cancelPasscodeButton").addEventListener("click", closeParentAuth);
 
-$("#manageRewardsButton").addEventListener("click", () => openRewardManager(state.rewardOwner));
+$("#manageRewardsButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) openRewardManager(state.rewardOwner);
+  else requestParentAuth({ action: "manageRewards", rewardOwner: state.rewardOwner });
+});
 $(".reward-kid-tabs").addEventListener("click", (event) => {
   const button = event.target.closest("[data-reward-owner]");
   if (!button) return;
@@ -2546,8 +2866,12 @@ $("#requestRedoButton").addEventListener("click", () => {
   else requestParentAuth({ action: "redo", choreId: state.detailChoreId });
 });
 
-$("#addChoreButton").addEventListener("click", openChoreForm);
-$("#fullAddChoreButton").addEventListener("click", openChoreForm);
+function requestOpenChoreForm() {
+  if (PROFILES[state.profile].adult) openChoreForm();
+  else requestParentAuth({ action: "addChore" });
+}
+$("#addChoreButton").addEventListener("click", requestOpenChoreForm);
+$("#fullAddChoreButton").addEventListener("click", requestOpenChoreForm);
 $("#choreForm").addEventListener("submit", (event) => {
   if (!event.submitter || event.submitter.value !== "save") return;
   event.preventDefault();
@@ -2564,7 +2888,7 @@ $("#choreForm").addEventListener("submit", (event) => {
     dueDate: $("#choreDueDateInput").value,
     dueTime: $("#choreDueTimeInput").value,
     repeat: $("#choreRepeatInput").value,
-    photoRequired: $("#chorePhotoRequiredInput").checked || points > 0 && (assignee === "harper" || assignee === "griffin"),
+    photoRequired: $("#chorePhotoRequiredInput").checked || points > 0 && isChildProfile(assignee),
     familyPriority: true,
     createdBy: state.profile,
   };
@@ -2587,10 +2911,7 @@ $("#confirmDeleteButton").addEventListener("click", async () => {
   if (!pending) return;
   elements.deleteConfirmDialog.close();
   state.pendingDelete = null;
-  if (pending.type === "art") {
-    removeArtwork(pending.id);
-    return;
-  }
+  if (pending.type === "art" && PROFILES[state.profile].adult) return removeArtwork(pending.id);
   if (pending.type === "activity" && state.activityAuthorizedBy) {
     clearActivityHistory();
     return;
@@ -2790,8 +3111,8 @@ $("#calendarEventForm").addEventListener("submit", (event) => {
 
 function openHabitDialog() {
   $("#habitForm").reset();
-  const isKid = state.profile === "harper" || state.profile === "griffin";
-  $("#habitPersonInput").value = isKid ? state.profile : state.profile === "family" ? "harper" : state.profile;
+  const isKid = isChildProfile(state.profile);
+  $("#habitPersonInput").value = isKid ? state.profile : state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
   $("#habitPersonInput").disabled = isKid;
   $("#habitTimeInput").value = "19:00";
   elements.habitDialog.showModal();
@@ -2925,6 +3246,10 @@ $("#timerReset").addEventListener("click", () => {
 
 $("#sleepButton").addEventListener("click", enterCalmMode);
 $("#wakeButton").addEventListener("click", leaveCalmMode);
+$("#familyMembersButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) openFamilySetup();
+  else requestParentAuth({ action: "familySetup" });
+});
 $("#sleepWakeButton").addEventListener("click", () => {
   if (PROFILES[state.profile].adult) openSleepSettings(state.profile);
   else requestParentAuth({ action: "sleep" });
@@ -3079,10 +3404,11 @@ document.addEventListener("click", (event) => {
     navigateTo(nav.dataset.view);
   }
 });
-$$(".settings-tile:not(#settingsLayoutButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
+$$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js?v=" + encodeURIComponent(APP_VERSION), { updateViaCache: "none" }).catch(() => {}));
 
+renderMemberControls();
 selectProfile(state.profile, { quiet: true });
 navigateTo(state.view, { quiet: true });
 renderTimer();
@@ -3092,3 +3418,4 @@ updateClock();
 renderStorageStatus();
 setTimeout(checkSleepSchedule, 400);
 setTimeout(checkEventReminders, 900);
+if (SETUP_REQUIRED) setTimeout(openFamilySetup, 0);

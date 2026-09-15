@@ -4,21 +4,24 @@ A touch-first family dashboard for chores, routines, rewards, schedules, shared 
 
 ## Current prototype
 
-- Family, Tyler, Rose, Harper, and Griffin dashboards with role-specific controls
+- First-run household setup for any number of parents, grandparents, caregivers, children, and dependents
+- Privacy-safe blank defaults: no household names, chores, schedules, rewards, habits, notes, lists, or artwork ship with the app
+- Family and personal dashboards with role-specific controls and editable names, roles, and profile colors
 - Personal visual themes, fast profile switching, and a three-minute return to Family
 - Full-screen Chores, Habits, Lists, Rewards, Calendar, Art, and Settings views
 - Per-profile widget ordering, sizing, and visibility controls
-- A save-and-spend reward shop with persistent point balances, multiple choices, double-confirmation purchases, parent notices, and reward scheduling
+- A save-and-spend reward shop with persistent point balances, multiple choices, double-confirmation purchases, adult notices, and reward scheduling
 - Before/after chore evidence with completed-chore backchecking
-- Parent passcodes, approval attribution, and points awarded only after approval
-- Parent-created chores assignable to any family member
-- Daily, weekday, and weekly repeating chores with parent-controlled removal
+- Adult passcodes, approval attribution, and points awarded only after approval
+- Adult-created chores assignable to any family member
+- Daily, weekday, and weekly repeating chores with adult-controlled removal
 - Habit and routine tracking with daily streaks and per-person views
 - A shared grocery/household/school/ideas list plus a pinned family note
 - Overdue and repeatedly missed chore warnings
-- Dashboard-created family calendar events for adults and kids, including edit and parent-gated delete controls
+- Dashboard-created family calendar events for adults and children, including edit and adult-gated delete controls
 - Full-screen artwork viewing and a touch-first finger-painting canvas
-- Artwork archiving, restoring, and parent-controlled permanent deletion
+- An offline Fun & Learn area with daily Spanish, French, and Japanese flash cards, speech playback, a reaction game, and a memory-matching game
+- Artwork archiving, restoring, and adult-controlled permanent deletion
 - Functional quick timer
 - Responsive tablet and iPhone layouts
 - Installable, offline-capable PWA foundation
@@ -29,12 +32,12 @@ A touch-first family dashboard for chores, routines, rewards, schedules, shared 
 - Filterable household activity history with CSV export
 - Google Calendar read-only import for primary and shared calendars
 - Fifteen-minute in-app event reminders with optional browser notifications
-- Parent-gated household controls and browser-data backup/restore
+- Adult-gated household controls and browser-data backup/restore
 - Live online/offline status with local changes remaining available offline
 - Shared timers that continue running across every dashboard view
 - Optional LAN synchronization protocol with a pairing link, connected-device status, host-authoritative data, and chore-photo transfer
 
-The current sample household names and content are placeholders that can be replaced during family setup.
+All household content is created and stored by the family using the app. Existing installs without a household profile are offered a one-time migration screen whose suggestions are derived only from data already stored on that device.
 
 ## Android kitchen host
 
@@ -53,15 +56,15 @@ The first Gradle sync downloads build tooling and therefore needs internet acces
 
 After the APK opens, go to **Settings → Connected devices**. Other family devices on the same non-guest Wi-Fi can open the displayed pairing address in Safari or Chrome; they do not install the host APK. Keep the pairing address private because it contains the household access token. The Android host's data is app-private, and **Settings → Local data & backup** creates a portable backup including photos.
 
-For dependable overnight hosting, open Android **Settings → Apps → HouseHelper → Battery** and choose **Unrestricted**. Keep Wi-Fi enabled and leave the persistent hosting notification allowed. HouseHelper 0.2.0 also holds a high-performance Wi-Fi lock while its foreground host service is running, which makes reconnecting after the screen sleeps substantially more reliable.
+For dependable overnight hosting, open Android **Settings → Apps → HouseHelper → Battery** and choose **Unrestricted**. Keep Wi-Fi enabled and leave the persistent hosting notification allowed. HouseHelper 0.3.0 also holds a high-performance Wi-Fi lock while its foreground host service is running, which makes reconnecting after the screen sleeps substantially more reliable.
 
 ### Updating the tablet after a new commit
 
 1. In Android Studio's **Terminal**, run `git pull` from the repository root.
 2. Wait for Gradle sync if Android Studio starts one. Confirm the run configuration still says `app` and the tablet is selected.
 3. Press **Run**. Android Studio rebuilds the bundled dashboard and installs it over the current debug app; household app data remains in place.
-4. In HouseHelper, open **Settings → Connected devices** and check **App build**. This reliability release shows `0.2.0-debug` on the tablet and `0.2.0` in phone browsers.
-5. On each secondary device, close the old HouseHelper tab and reopen the pairing address shown by the tablet. The connection details should say **Secondary**, and the phone's build and host build should both be 0.2.0.
+4. In HouseHelper, open **Settings → Connected devices** and check **App build**. This release shows `0.3.0-debug` on the tablet and `0.3.0` in phone browsers.
+5. On each secondary device, close the old HouseHelper tab and reopen the pairing address shown by the tablet. The connection details should say **Secondary**, and the phone's build and host build should both be 0.3.0.
 
 If the screen still looks unchanged after step 3, uninstalling is not the first choice because it removes the debug app's private household data. First run the app again from Android Studio and use the build label above to verify which APK is actually installed. Make a complete backup before any uninstall or switch between debug and release builds.
 

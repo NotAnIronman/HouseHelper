@@ -9,8 +9,8 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 await import(new URL("../dist/compat.js", import.meta.url));
 const compat = globalThis.HouseHelperCompat;
 
-assert.equal(compat.VERSION, "0.2.0");
-for (const [person, code] of [["tyler", "1234"], ["rose", "0000"], ["tyler", "9876"]]) {
+assert.equal(compat.VERSION, "0.3.0");
+for (const [person, code] of [["adult-a", "1234"], ["caregiver-b", "0000"], ["adult-a", "9876"]]) {
   const source = `HouseHelper:${person}:${code}:local-parent`;
   const expected = createHash("sha256").update(source).digest("hex");
   assert.equal(compat.sha256Hex(new TextEncoder().encode(source)), expected, "insecure-LAN passcode hashing must match SHA-256");
@@ -33,14 +33,24 @@ const server = await readFile(join(root, "android-host", "app", "src", "main", "
 assert.match(html, /id="passcodeForm" novalidate/);
 assert.match(html, /id="unlockButton" type="button"/);
 assert.match(html, /id="saveDeviceNameButton" type="button"/);
-assert.match(html, /compat\.js\?v=0\.2\.0/);
-assert.match(worker, /compat\.js\?v=0\.2\.0/);
+assert.match(html, /id="familySetupDialog"/);
+assert.match(html, /id="adultMemberEditors"/);
+assert.match(html, /id="childMemberEditors"/);
+assert.match(html, /data-app-view="fun"/);
+assert.match(html, /compat\.js\?v=0\.3\.0/);
+assert.match(worker, /compat\.js\?v=0\.3\.0/);
 assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/, "service worker must never cache household API responses");
 assert.match(app, /updateViaCache:\s*"none"/, "service worker updates must bypass stale HTTP caches");
 assert.match(sync, /hs-sync-baseline-v1/, "sync baseline must survive reloads so offline edits can retry");
 assert.match(sync, /markEntriesSynced\(pending\.changes\)/, "local edits must be marked synced only after a successful push");
-assert.match(gradle, /versionName = "0\.2\.0"/);
-assert.match(server, /APP_VERSION = "0\.2\.0"/);
+assert.match(sync, /familySetupDialog[\s\S]*hh-family-config/, "a new secondary must reload after receiving household setup from its host");
+assert.match(gradle, /versionName = "0\.3\.0"/);
+assert.match(server, /APP_VERSION = "0\.3\.0"/);
+assert.match(app, /const DEFAULT_CHORES = \[\];/);
+assert.match(app, /const DEFAULT_ARTWORKS = \[\];/);
+assert.match(app, /const DEFAULT_EVENTS = \[\];/);
+assert.match(app, /const DEFAULT_HABITS = \[\];/);
+assert.match(app, /const DEFAULT_LIST_ITEMS = \[\];/);
 
 const referencedIds = [...app.matchAll(/\$\("#([A-Za-z][\w:-]*)"\)/g)].map((match) => match[1]);
 const dynamicIds = new Set([...app.matchAll(/\.id\s*=\s*["']([A-Za-z][\w:-]*)["']/g)].map((match) => match[1]));
@@ -88,7 +98,7 @@ const context = {
     const payload = options.method === "POST"
       ? { revision: 1, clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" }
       : { revision: 1, entries: [], clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" };
-    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.2.0" : null }, json: async () => payload };
+    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.3.0" : null }, json: async () => payload };
   },
   localStorage: storage,
   location: { hostname: "192.168.1.2", origin: "http://192.168.1.2:4173", pathname: "/", search: "?pair=test-token", reload() {}, assign() {} },

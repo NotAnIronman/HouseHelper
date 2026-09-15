@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.2.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.3.0" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -56,6 +56,7 @@
         <button class="nav-item" data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
         <button class="nav-item" data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
         <button class="nav-item" data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art show</span></button>
+        <button class="nav-item" data-view="fun" type="button"><span class="nav-emoji">✦</span><span>Fun & learn</span></button>
         <button class="nav-item nav-settings" data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
       </aside>
 
@@ -80,13 +81,10 @@
             <div class="card-header">
               <div>
                 <p class="eyebrow">Save & spend</p>
-                <h2 id="rewardTitle">Harper’s reward shop</h2>
+                <h2 id="rewardTitle">Reward shop</h2>
               </div>
               <div class="reward-controls adult-only">
-                <div class="reward-kid-tabs" aria-label="Choose kid reward account">
-                  <button class="active" data-reward-owner="harper" type="button">Harper</button>
-                  <button data-reward-owner="griffin" type="button">Griffin</button>
-                </div>
+                <div class="reward-kid-tabs" aria-label="Choose child reward account"></div>
                 <button class="secondary-button" id="manageRewardsButton" type="button">Manage</button>
               </div>
             </div>
@@ -141,10 +139,8 @@
           </section>
 
           <section class="card art-card" id="art" data-widget="art" aria-labelledby="artTitle">
-            <div class="card-header compact"><div><p class="eyebrow">Family gallery</p><h2 id="artTitle">Art show</h2></div><span class="art-count" id="artCount">2 pieces</span></div>
+            <div class="card-header compact"><div><p class="eyebrow">Family gallery</p><h2 id="artTitle">Art show</h2></div><span class="art-count" id="artCount">0 pieces</span></div>
             <div class="art-wall" id="artWall">
-              <div class="art-piece art-one" role="img" aria-label="Colorful sample artwork"><span>MY<br>HAPPY<br>PLACE</span></div>
-              <div class="art-piece art-two" role="img" aria-label="Abstract sample artwork"><span>★</span></div>
               <label class="add-art"><input id="artUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg><span>Add art</span></label>
             </div>
           </section>
@@ -155,9 +151,7 @@
           <header class="view-header"><div><p class="eyebrow">Full chore board</p><h1>Chores & approvals</h1><p>Track today’s work, review photo evidence, and catch anything falling behind.</p></div><button class="primary-button adult-only" type="button" id="fullAddChoreButton">+ Add chore</button></header>
           <div class="review-queue-panel" id="reviewQueuePanel" hidden><span class="review-symbol">✓</span><div><strong id="reviewQueueTitle">A chore is ready to review</strong><span id="reviewQueueSummary">Open the highlighted chore to compare its photos.</span></div></div>
           <div class="warning-panel" id="warningPanel"><span class="warning-symbol">!</span><div><strong id="warningTitle">2 chores need attention</strong><span id="warningSummary">One is overdue and one has been missed repeatedly.</span></div></div>
-          <div class="filter-row" aria-label="Filter chores by person">
-            <button class="active" data-chore-filter="all" type="button">Everyone</button><button data-chore-filter="tyler" type="button">Tyler</button><button data-chore-filter="rose" type="button">Rose</button><button data-chore-filter="harper" type="button">Harper</button><button data-chore-filter="griffin" type="button">Griffin</button>
-          </div>
+          <div class="filter-row" id="choreFilters" aria-label="Filter chores by person"></div>
           <div class="full-chore-list" id="fullChoreList"></div>
         </section>
 
@@ -176,13 +170,13 @@
         <section class="app-view full-app-view" id="habitsView" data-app-view="habits" hidden>
           <header class="view-header"><div><p class="eyebrow">Healthy family rhythms</p><h1>Habits & routines</h1><p>Small daily wins, visible streaks, and gentle resets when life gets busy.</p></div><button class="primary-button" id="addHabitButton" type="button">+ Add habit</button></header>
           <div class="vacation-banner" id="vacationBanner" hidden><span>☀</span><div><strong>Vacation mode is on</strong><small>Repeating chores are paused. Habits can still be checked voluntarily.</small></div></div>
-          <div class="filter-row" id="habitFilters" aria-label="Filter habits by person"><button class="active" data-habit-filter="all" type="button">Everyone</button><button data-habit-filter="tyler" type="button">Tyler</button><button data-habit-filter="rose" type="button">Rose</button><button data-habit-filter="harper" type="button">Harper</button><button data-habit-filter="griffin" type="button">Griffin</button></div>
+          <div class="filter-row" id="habitFilters" aria-label="Filter habits by person"></div>
           <div class="habit-board" id="habitBoard"></div>
         </section>
 
         <section class="app-view full-app-view" id="listsView" data-app-view="lists" hidden>
           <header class="view-header"><div><p class="eyebrow">Shared household memory</p><h1>Family list</h1><p>Groceries, school needs, household supplies, and ideas anyone can capture.</p></div></header>
-          <section class="bulletin-card"><div><p class="eyebrow">Pinned family note</p><h2>What everyone should know</h2></div><textarea id="familyNoteInput" maxlength="280" placeholder="Dinner is at 6:30. Harper needs her blue folder tomorrow."></textarea><button class="primary-button" id="saveFamilyNoteButton" type="button">Save note</button></section>
+          <section class="bulletin-card"><div><p class="eyebrow">Pinned family note</p><h2>What everyone should know</h2></div><textarea id="familyNoteInput" maxlength="280" placeholder="Add a note for everyone…"></textarea><button class="primary-button" id="saveFamilyNoteButton" type="button">Save note</button></section>
           <form class="list-composer" id="fullListForm"><input id="fullListInput" maxlength="60" placeholder="What should we remember?" required /><select id="listCategoryInput" aria-label="List category"><option value="groceries">Groceries</option><option value="household">Household</option><option value="school">School</option><option value="ideas">Ideas</option></select><button class="primary-button" type="submit">Add item</button></form>
           <div class="filter-row" id="listFilters" aria-label="Filter shared list"><button class="active" data-list-filter="all" type="button">Everything</button><button data-list-filter="groceries" type="button">Groceries</button><button data-list-filter="household" type="button">Household</button><button data-list-filter="school" type="button">School</button><button data-list-filter="ideas" type="button">Ideas</button><button data-list-filter="done" type="button">Completed</button></div>
           <div class="shared-list" id="sharedList"></div>
@@ -193,9 +187,32 @@
           <div class="gallery-grid" id="fullArtWall"></div>
         </section>
 
+        <section class="app-view full-app-view" id="funView" data-app-view="fun" hidden>
+          <header class="view-header"><div><p class="eyebrow">Play a little, learn a little</p><h1>Fun & learn</h1><p>Quick activities designed for a shared screen—no ads, accounts, or purchases.</p></div></header>
+          <div class="fun-grid">
+            <section class="fun-card learning-card">
+              <div class="card-header"><div><p class="eyebrow">Daily language card</p><h2 id="flashcardHeading">Today’s word</h2></div><select id="learningLanguage" aria-label="Learning language"><option value="spanish">Spanish</option><option value="french">French</option><option value="japanese">Japanese</option></select></div>
+              <button class="flashcard" id="flashcard" type="button"><span id="flashcardPrompt">Hello</span><strong id="flashcardAnswer">Tap to reveal</strong><small id="flashcardPronunciation"></small></button>
+              <div class="fun-actions"><button class="secondary-button" id="hearFlashcardButton" type="button">🔊 Hear it</button><button class="primary-button" id="learnedFlashcardButton" type="button">I learned this</button><button class="secondary-button" id="nextFlashcardButton" type="button">Next card</button></div>
+              <p class="learning-progress" id="learningProgress">0 words learned</p>
+            </section>
+            <section class="fun-card">
+              <p class="eyebrow">Speed game</p><h2>Lightning tap</h2><p>Wait for the tile to turn green, then tap as quickly as you can.</p>
+              <button class="reaction-pad" id="reactionPad" type="button"><strong>Start</strong><span id="reactionMessage">Tap to play</span></button>
+              <p class="game-stat" id="reactionBest">No best time yet</p>
+            </section>
+            <section class="fun-card memory-card-wrap">
+              <div class="card-header"><div><p class="eyebrow">Memory game</p><h2>Match the pairs</h2></div><button class="secondary-button" id="resetMemoryButton" type="button">New game</button></div>
+              <div class="memory-board" id="memoryBoard" aria-label="Memory matching game"></div>
+              <p class="game-stat" id="memoryStatus">0 moves</p>
+            </section>
+          </div>
+        </section>
+
         <section class="app-view full-app-view" id="settingsView" data-app-view="settings" hidden>
           <header class="view-header"><div><p class="eyebrow">HouseHelper controls</p><h1>Settings</h1><p>Personalize the kitchen dashboard and family experience.</p></div></header>
           <div class="settings-grid">
+            <button class="settings-tile" id="familyMembersButton" type="button"><span class="settings-icon">⌂</span><span><strong>Household members</strong><small id="familyMembersLabel">Names, roles, colors, and accounts</small></span><b>›</b></button>
             <button class="settings-tile" id="settingsLayoutButton" type="button"><span class="settings-icon"><svg><use href="#icon-settings"></use></svg></span><span><strong>Home layout</strong><small>Resize, reorder, or hide widgets</small></span><b>›</b></button>
             <button class="settings-tile" id="profileThemesButton" type="button"><span class="settings-icon"><svg><use href="#icon-star"></use></svg></span><span><strong>Profile themes</strong><small id="profileThemeLabel">Colors, type, icon size, and personality</small></span><b>›</b></button>
             <button class="settings-tile" id="sleepWakeButton" type="button"><span class="settings-icon"><svg><use href="#icon-moon"></use></svg></span><span><strong>Sleep & wake</strong><small id="sleepWakeLabel">Calm mode currently begins at 9:00 PM</small></span><b>›</b></button>
@@ -216,6 +233,7 @@
         <button data-view="habits" type="button"><svg><use href="#icon-habit"></use></svg><span>Habits</span></button>
         <button data-view="lists" type="button"><svg><use href="#icon-list"></use></svg><span>Lists</span></button>
         <button data-view="art" type="button"><svg><use href="#icon-palette"></use></svg><span>Art</span></button>
+        <button data-view="fun" type="button"><span class="nav-emoji">✦</span><span>Fun</span></button>
         <button data-view="settings" type="button"><svg><use href="#icon-settings"></use></svg><span>Settings</span></button>
       </nav>
     </div>
@@ -229,17 +247,26 @@
       </button>
     </div>
 
+    <dialog id="familySetupDialog" class="app-dialog setup-dialog">
+      <form class="dialog-panel setup-panel" id="familySetupForm">
+        <div class="dialog-header"><div><p class="eyebrow">Welcome to HouseHelper</p><h2 id="familySetupTitle">Set up your household</h2></div><button class="close-button" id="closeFamilySetupButton" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-body">
+          <p class="setup-intro" id="familySetupIntro">Create an adult profile for each parent, grandparent, or caregiver and a child profile for every child. Your dashboard will begin completely blank.</p>
+          <label class="field"><span>Household name</span><input id="familyNameInput" maxlength="40" placeholder="The Smith Family" required /></label>
+          <div class="setup-section"><div class="setup-section-title"><div><strong>Adults & caregivers</strong><small>Adult profiles can approve chores and manage rewards.</small></div><button class="secondary-button" id="addAdultMemberButton" type="button">+ Add adult</button></div><div class="member-editor-list" id="adultMemberEditors"></div></div>
+          <div class="setup-section"><div class="setup-section-title"><div><strong>Children & dependents</strong><small>Add as many as your household needs. This section may be empty.</small></div><button class="secondary-button" id="addChildMemberButton" type="button">+ Add child</button></div><div class="member-editor-list" id="childMemberEditors"></div></div>
+          <p class="setup-note">Everything stays on this device unless you connect it to a household host. Removing a profile later hides it but does not erase its saved history.</p>
+          <p class="passcode-error" id="familySetupError" role="alert"></p>
+          <div class="dialog-actions"><button class="primary-button" type="submit">Save household</button></div>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="profileDialog" class="app-dialog profile-dialog">
       <form method="dialog" class="dialog-panel">
         <div class="dialog-header"><div><p class="eyebrow">Dashboard view</p><h2>Who’s using HouseHelper?</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
         <div class="dialog-body">
-          <div class="profile-grid" role="list" aria-label="Dashboard profiles">
-            <button class="profile-option family" data-profile="family" type="button"><span class="profile-option-avatar">⌂</span><span><strong>Family</strong><small>Shared dashboard</small></span><span class="selected-check">✓</span></button>
-            <button class="profile-option tyler" data-profile="tyler" type="button"><span class="profile-option-avatar">T</span><span><strong>Tyler</strong><small>Father · Adult</small></span><span class="selected-check">✓</span></button>
-            <button class="profile-option rose" data-profile="rose" type="button"><span class="profile-option-avatar">R</span><span><strong>Rose</strong><small>Mother · Adult</small></span><span class="selected-check">✓</span></button>
-            <button class="profile-option harper" data-profile="harper" type="button"><span class="profile-option-avatar">H</span><span><strong>Harper</strong><small>Daughter · Kid</small></span><span class="selected-check">✓</span></button>
-            <button class="profile-option griffin" data-profile="griffin" type="button"><span class="profile-option-avatar">G</span><span><strong>Griffin</strong><small>Son · Kid</small></span><span class="selected-check">✓</span></button>
-          </div>
+          <div class="profile-grid" role="list" aria-label="Dashboard profiles"></div>
           <p class="profile-note"><svg><use href="#icon-clock"></use></svg><span>Personal dashboards return to Family after three minutes without activity. Shared timers and alerts keep running.</span></p>
         </div>
       </form>
@@ -247,17 +274,14 @@
 
     <dialog id="passcodeDialog" class="app-dialog passcode-dialog">
       <form class="dialog-panel" id="passcodeForm" novalidate>
-        <div class="dialog-header"><div><p class="eyebrow">Parent verification</p><h2 id="passcodeTitle">Enter parent passcode</h2></div><button class="close-button" id="closePasscodeButton" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Adult verification</p><h2 id="passcodeTitle">Enter adult passcode</h2></div><button class="close-button" id="closePasscodeButton" aria-label="Close" type="button">×</button></div>
         <div class="dialog-body">
-          <p class="passcode-help" id="passcodeHelp">Choose a parent, then enter their four-digit passcode.</p>
-          <div class="parent-picker" id="parentPicker" aria-label="Choose parent account">
-            <button class="active" data-parent="tyler" type="button"><span>T</span>Tyler</button>
-            <button data-parent="rose" type="button"><span>R</span>Rose</button>
-          </div>
+          <p class="passcode-help" id="passcodeHelp">Choose an adult or caregiver, then enter their four-digit passcode.</p>
+          <div class="parent-picker" id="parentPicker" aria-label="Choose adult account"></div>
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
-          <p class="security-note">Passcodes protect parent actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.2.0</p>
+          <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.3.0</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -274,22 +298,22 @@
           </div>
           <div class="approval-record" id="approvalRecord"></div>
         </div>
-        <div class="dialog-footer" id="detailActions"><button class="secondary-button request-redo-button" id="requestRedoButton" type="button">Request new photos</button><button class="primary-button" id="approveChoreButton" type="button">Verify parent & approve</button></div>
+        <div class="dialog-footer" id="detailActions"><button class="secondary-button request-redo-button" id="requestRedoButton" type="button">Request new photos</button><button class="primary-button" id="approveChoreButton" type="button">Verify adult & approve</button></div>
       </div>
     </dialog>
 
     <dialog id="choreFormDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="choreForm">
-        <div class="dialog-header"><div><p class="eyebrow">Parent chore builder</p><h2>Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Adult chore builder</p><h2>Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>What needs doing?</span><input id="choreTitleInput" maxlength="60" placeholder="Clean the bathroom mirror" required /></label>
-          <label class="field"><span>Assign to</span><select id="choreAssigneeInput" required><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <label class="field"><span>Assign to</span><select id="choreAssigneeInput" required></select></label>
           <label class="field"><span>Room or category</span><input id="choreAreaInput" maxlength="35" placeholder="Bathroom" required /></label>
           <label class="field"><span>Points</span><input id="chorePointsInput" type="number" min="0" max="500" value="10" inputmode="numeric" required /></label>
           <label class="field"><span>Due date</span><input id="choreDueDateInput" type="date" required /></label>
           <label class="field"><span>Due time</span><input id="choreDueTimeInput" type="time" value="18:00" required /></label>
           <label class="field field-wide"><span>Repeats</span><select id="choreRepeatInput"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week on this day</option></select></label>
-          <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until a parent reviews the evidence.</small></span></label>
+          <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until an adult reviews the evidence.</small></span></label>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add chore</button></div>
       </form>
@@ -310,7 +334,7 @@
       <form method="dialog" class="dialog-panel" id="themeForm">
         <div class="dialog-header"><div><p class="eyebrow">Make it yours</p><h2>Profile theme</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body">
-          <label class="field theme-profile-field"><span>Customize dashboard</span><select id="themeProfileInput"><option value="family">Family</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <label class="field theme-profile-field"><span>Customize dashboard</span><select id="themeProfileInput"></select></label>
           <p class="field-label">Accent color</p>
           <div class="theme-swatches" id="themeSwatches" aria-label="Theme colors"><button data-theme-color="#14392f" style="--theme-swatch:#14392f" type="button" aria-label="Forest"></button><button data-theme-color="#203e63" style="--theme-swatch:#203e63" type="button" aria-label="Blue"></button><button data-theme-color="#5b365f" style="--theme-swatch:#5b365f" type="button" aria-label="Plum"></button><button data-theme-color="#78325c" style="--theme-swatch:#78325c" type="button" aria-label="Pink"></button><button data-theme-color="#174c69" style="--theme-swatch:#174c69" type="button" aria-label="Ocean"></button><button data-theme-color="#8a4b20" style="--theme-swatch:#8a4b20" type="button" aria-label="Amber"></button></div>
           <div class="form-grid">
@@ -367,7 +391,7 @@
           <div class="connection-status-card" id="googleConnectionStatus"><span></span><div><strong>Not connected</strong><small>Local calendar events are still available.</small></div></div>
           <label class="field"><span>Google OAuth web client ID</span><input id="googleClientIdInput" type="text" autocomplete="off" placeholder="1234567890-example.apps.googleusercontent.com" /></label>
           <p class="integration-help">The client ID is public configuration and stays in this browser. Access tokens are kept in memory only and are never backed up. Google sign-in should be completed in Chrome or the installed PWA; embedded preview browsers may block it.</p>
-          <div class="form-grid"><label class="field"><span>Assign imported events to</span><select id="googleOwnerInput"><option value="family">Everyone</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label><label class="field"><span>Import upcoming</span><select id="googleDaysInput"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">6 months</option></select></label></div>
+          <div class="form-grid"><label class="field"><span>Assign imported events to</span><select id="googleOwnerInput"></select></label><label class="field"><span>Import upcoming</span><select id="googleDaysInput"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">6 months</option></select></label></div>
           <div class="google-calendar-list" id="googleCalendarList"></div>
           <div class="settings-section"><div><p class="eyebrow">Event reminders</p><h3>Upcoming alerts</h3></div><label class="check-field"><input id="remindersEnabledInput" type="checkbox" checked /><span><strong>Show an in-app popup</strong><small>Works while HouseHelper is open.</small></span></label><div class="form-grid"><label class="field"><span>Alert me</span><select id="reminderLeadInput"><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15" selected>15 minutes before</option><option value="30">30 minutes before</option></select></label><div class="field"><span>Device notification</span><button class="secondary-dark-button" id="enableNotificationsButton" type="button">Enable device alerts</button></div></div><small class="permission-copy" id="notificationPermissionLabel">In-app reminders are already enabled.</small></div>
         </div>
@@ -377,9 +401,9 @@
 
     <dialog id="rewardDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="rewardForm">
-        <div class="dialog-header"><div><p class="eyebrow">Adult controls</p><h2 id="rewardDialogTitle">Manage Harper’s rewards</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Adult controls</p><h2 id="rewardDialogTitle">Manage rewards</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
         <div class="dialog-body">
-          <div class="point-control"><span>Current balance</span><strong><span id="dialogPoints">80</span> pts</strong></div>
+          <div class="point-control"><span>Current balance</span><strong><span id="dialogPoints">0</span> pts</strong></div>
           <p class="field-label">Quick adjustment</p>
           <div class="point-buttons"><button type="button" data-points="-5">−5</button><button type="button" data-points="5">+5</button><button type="button" data-points="10">+10</button><button type="button" data-points="20">+20</button></div>
           <p class="field-label">Current reward choices</p>
@@ -389,7 +413,7 @@
             <label class="field"><span>Cost</span><input id="rewardTargetInput" type="number" min="10" max="9999" inputmode="numeric" placeholder="75" /></label>
             <label class="field reward-emoji-field"><span>Emoji</span><input id="rewardEmojiInput" maxlength="4" value="🎁" /></label>
           </div>
-          <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Make progress feel reachable.</strong><br /><span id="rewardNoteName">Harper</span> currently earns 10–20 points per chore.</p></div>
+          <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Make progress feel reachable.</strong><br /><span id="rewardNoteName">This child</span> earns points only from approved chores.</p></div>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveRewardButton" value="default" type="submit">Save changes</button></div>
       </form>
@@ -408,11 +432,11 @@
         <div class="dialog-header"><div><p class="eyebrow">Family calendar</p><h2 id="calendarEventTitle">Add an event</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>Event name</span><input id="eventNameInput" maxlength="70" placeholder="Dentist appointment" required /></label>
-          <label class="field"><span>Who is it for?</span><select id="eventPeopleInput" required><option value="family">Everyone</option><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option><option value="kids">Harper & Griffin</option></select></label>
+          <label class="field"><span>Who is it for?</span><select id="eventPeopleInput" required></select></label>
           <label class="field"><span>Location</span><input id="eventLocationInput" maxlength="50" placeholder="Home" /></label>
           <label class="field"><span>Date</span><input id="eventDateInput" type="date" required /></label>
           <label class="field"><span>Time</span><input id="eventTimeInput" type="time" required /></label>
-          <p class="trust-note field-wide" id="eventSourceNote">Everyone—including Harper and Griffin—can add family calendar items. Connected calendars will appear beside these dashboard-created events.</p>
+          <p class="trust-note field-wide" id="eventSourceNote">Everyone can add family calendar items. Connected calendars will appear beside dashboard-created events.</p>
           <a class="secondary-dark-button google-event-link field-wide" id="openGoogleEventLink" target="_blank" rel="noopener" hidden>Open in Google Calendar</a>
         </div>
         <div class="dialog-footer split-footer"><button class="danger-button" id="deleteEventButton" type="button" hidden>Delete event</button><span></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveEventButton" value="save" type="submit">Add to calendar</button></div>
@@ -424,11 +448,11 @@
         <div class="dialog-header"><div><p class="eyebrow">Build a routine</p><h2>Add a family habit</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>Habit</span><input id="habitNameInput" maxlength="60" placeholder="Brush teeth" required /></label>
-          <label class="field"><span>For</span><select id="habitPersonInput" required><option value="tyler">Tyler</option><option value="rose">Rose</option><option value="harper">Harper</option><option value="griffin">Griffin</option></select></label>
+          <label class="field"><span>For</span><select id="habitPersonInput" required></select></label>
           <label class="field"><span>Icon</span><select id="habitIconInput"><option value="🪥">🪥 Teeth</option><option value="📚">📚 Reading</option><option value="💧">💧 Water</option><option value="💊">💊 Medicine</option><option value="🧘">🧘 Mindfulness</option><option value="🏃">🏃 Movement</option><option value="✨">✨ Other</option></select></label>
           <label class="field"><span>Schedule</span><select id="habitScheduleInput"><option value="daily">Every day</option><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option></select></label>
           <label class="field"><span>Best time</span><input id="habitTimeInput" type="time" value="19:30" required /></label>
-          <p class="trust-note field-wide">Kids can create and check their own habits. Parents can create routines for anyone.</p>
+          <p class="trust-note field-wide">Children can create and check their own habits. Adults can create routines for anyone.</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add habit</button></div>
       </form>
@@ -448,7 +472,7 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.2.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.3.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
           <div class="pairing-card" id="pairingCard" hidden><span>Pairing address</span><strong id="pairingAddress"></strong><p>Open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi‑Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.</p>
@@ -501,8 +525,8 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.2.0" defer></script>
-    <script src="./app.js?v=0.2.0" defer></script>
-    <script src="./sync.js?v=0.2.0" defer></script>
+    <script src="./compat.js?v=0.3.0" defer></script>
+    <script src="./app.js?v=0.3.0" defer></script>
+    <script src="./sync.js?v=0.3.0" defer></script>
   </body>
 </html>

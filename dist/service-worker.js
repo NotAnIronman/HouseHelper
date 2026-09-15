@@ -1,5 +1,5 @@
-const CACHE = "househelper-v19";
-const ASSETS = ["./", "./index.html", "./styles.css?v=0.2.0", "./compat.js?v=0.2.0", "./app.js?v=0.2.0", "./sync.js?v=0.2.0", "./manifest.webmanifest", "./favicon.svg"];
+const CACHE = "househelper-v20";
+const ASSETS = ["./", "./index.html", "./styles.css?v=0.3.0", "./compat.js?v=0.3.0", "./app.js?v=0.3.0", "./sync.js?v=0.3.0", "./manifest.webmanifest", "./favicon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
