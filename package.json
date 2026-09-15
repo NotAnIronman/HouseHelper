@@ -5,6 +5,7 @@
   "description": "Touch-first family dashboard and PWA",
   "scripts": {
     "dev": "node scripts/serve.mjs",
-    "check": "node --check dist/app.js && node --check dist/service-worker.js && node --check scripts/serve.mjs"
+    "lan": "node scripts/lan-host.mjs",
+    "check": "node --check dist/app.js && node --check dist/sync.js && node --check dist/service-worker.js && node --check scripts/serve.mjs && node --check scripts/lan-host.mjs"
   }
 }

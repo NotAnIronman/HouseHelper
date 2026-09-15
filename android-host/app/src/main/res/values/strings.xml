@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HouseHelper</string>
+    <string name="host_channel_name">Household host</string>
+    <string name="host_channel_description">Keeps the family dashboard available to devices on your home Wi-Fi.</string>
+    <string name="host_notification_title">HouseHelper is hosting</string>
+    <string name="host_notification_text">Family devices can connect while this tablet is on your home Wi-Fi.</string>
+</resources>

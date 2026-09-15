@@ -381,6 +381,29 @@ body[data-profile="harper"] .nav-item svg, body[data-profile="harper"] .mobile-n
 .backup-actions { display: flex; gap: 10px; margin-top: 20px; }
 .backup-upload { display: inline-flex; align-items: center; cursor: pointer; }
 .backup-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.connected-devices-dialog { width: min(94vw, 680px); }
+.connected-devices-dialog .dialog-panel { width: 100%; }
+.device-host-status { display: flex; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); border-radius: 18px; background: #f6f7f4; }
+.device-host-status > div { display: flex; flex-direction: column; min-width: 0; }
+.device-host-status small { margin-top: 4px; color: var(--muted); line-height: 1.4; }
+.device-status-dot { width: 17px; height: 17px; flex: 0 0 17px; border: 4px solid #d8ddda; border-radius: 50%; background: #87918c; box-shadow: 0 0 0 4px #edf0ee; }
+.device-host-status.connected { border-color: #a6d5bd; background: #eff9f3; }
+.device-host-status.connected .device-status-dot { border-color: #ccebd9; background: #2e865f; box-shadow: 0 0 0 4px #e1f4e9; }
+.device-host-status.offline { border-color: #e6c9a5; background: #fff8ed; }
+.device-host-status.offline .device-status-dot { border-color: #f5dfc3; background: #bf762a; box-shadow: 0 0 0 4px #fff0dc; }
+.connected-devices-dialog .field { margin-top: 16px; }
+.pairing-card { margin-top: 16px; padding: 16px; border-radius: 18px; background: var(--forest); color: white; }
+.pairing-card > span { display: block; color: #c4d9d1; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.pairing-card > strong { display: block; overflow-wrap: anywhere; margin-top: 7px; font-size: .82rem; line-height: 1.45; }
+.pairing-card p { margin: 9px 0 13px; color: #e4eeea; font-size: .76rem; line-height: 1.45; }
+.pairing-card .secondary-dark-button { background: white; color: var(--forest); }
+.connected-device-list { display: grid; gap: 8px; margin-top: 16px; }
+.device-list-title { margin: 0 0 2px; color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.connected-device-list article { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 15px; background: white; }
+.connected-device-list article > span { color: #39a170; font-size: .65rem; }
+.connected-device-list article > div { display: flex; flex-direction: column; }
+.connected-device-list article small { margin-top: 2px; color: var(--muted); font-size: .68rem; }
+.device-help { margin: 16px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.5; }
 .split-footer { display: grid; grid-template-columns: auto 1fr auto auto; }
 .calm-screen { --calm-color: #102721; position: fixed; inset: 0; display: grid; place-items: center; overflow: hidden; background: var(--calm-color); color: #e8f2ed; opacity: 0; pointer-events: none; transition: opacity .7s ease; z-index: 100; }
 .calm-screen.active { opacity: 1; pointer-events: auto; }

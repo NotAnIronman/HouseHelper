@@ -202,6 +202,7 @@
             <button class="settings-tile" id="vacationModeButton" type="button"><span class="settings-icon">☀</span><span><strong>Vacation mode</strong><small id="vacationModeLabel">Repeating chores are running normally</small></span><b>›</b></button>
             <button class="settings-tile" id="activityButton" type="button"><span class="settings-icon"><svg><use href="#icon-list"></use></svg></span><span><strong>Household activity</strong><small>Approvals, rewards, schedules, and changes</small></span><b>›</b></button>
             <button class="settings-tile" id="googleCalendarButton" type="button"><span class="settings-icon"><svg><use href="#icon-calendar"></use></svg></span><span><strong>Google Calendar</strong><small id="googleCalendarLabel">Connect shared family schedules</small></span><b>›</b></button>
+            <button class="settings-tile" id="connectedDevicesButton" type="button"><span class="settings-icon">⌁</span><span><strong>Connected devices</strong><small id="connectedDevicesLabel">Standalone on this device</small></span><b>›</b></button>
             <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Local data & backup</strong><small id="storageTileLabel">Saved privately in this browser</small></span><b>›</b></button>
           </div>
         </section>
@@ -437,7 +438,21 @@
     </dialog>
 
     <dialog id="backupDialog" class="app-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local data safety</p><h2>Local data & backup</h2></div><button class="close-button" id="closeBackupButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="storage-status-card" id="storageStatusCard"><span>✓</span><div><strong>Your changes save locally</strong><small id="storageStatusText">Checking browser storage protection…</small></div></div><p class="backup-copy">HouseHelper data belongs to this website address and this browser profile. Download a backup before clearing browser data or moving to a different device. Chore evidence photos and the sleep-screen image stay in this browser’s photo database and are not included in the JSON backup yet.</p><div class="backup-actions"><button class="secondary-dark-button" id="persistStorageButton" type="button">Protect storage</button><button class="primary-button" id="downloadBackupButton" type="button">Download backup</button><label class="secondary-dark-button backup-upload">Restore backup<input id="restoreBackupInput" type="file" accept="application/json,.json" /></label></div></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local data safety</p><h2>Local data & backup</h2></div><button class="close-button" id="closeBackupButton" aria-label="Close" type="button">×</button></div><div class="dialog-body"><div class="storage-status-card" id="storageStatusCard"><span>✓</span><div><strong>Your changes save locally</strong><small id="storageStatusText">Checking browser storage protection…</small></div></div><p class="backup-copy">HouseHelper data belongs to this website address and browser profile. Download a complete backup before clearing browser data, moving to the kitchen host, or replacing the tablet. Version 2 backups include chore photos and the custom sleep-screen image.</p><div class="backup-actions"><button class="secondary-dark-button" id="persistStorageButton" type="button">Protect storage</button><button class="primary-button" id="downloadBackupButton" type="button">Download complete backup</button><label class="secondary-dark-button backup-upload">Restore backup<input id="restoreBackupInput" type="file" accept="application/json,.json" /></label></div></div></div>
+    </dialog>
+
+    <dialog id="connectedDevicesDialog" class="app-dialog connected-devices-dialog">
+      <div class="dialog-panel">
+        <div class="dialog-header"><div><p class="eyebrow">Household network</p><h2>Connected devices</h2></div><button class="close-button" id="closeConnectedDevicesButton" aria-label="Close" type="button">×</button></div>
+        <div class="dialog-body">
+          <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
+          <label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" placeholder="Kitchen tablet" /></label>
+          <div class="pairing-card" id="pairingCard" hidden><span>Pairing address</span><strong id="pairingAddress"></strong><p>Open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div>
+          <div class="connected-device-list" id="connectedDeviceList"></div>
+          <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi‑Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.</p>
+        </div>
+        <div class="dialog-footer"><button class="danger-button" id="disconnectDeviceButton" type="button" hidden>Disconnect this device</button><span class="dialog-spacer"></span><button class="primary-button" id="doneConnectedDevicesButton" type="button">Done</button></div>
+      </div>
     </dialog>
 
     <dialog id="eventReminderDialog" class="app-dialog reminder-dialog">
@@ -485,5 +500,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
     <script src="./app.js" defer></script>
+    <script src="./sync.js" defer></script>
   </body>
 </html>

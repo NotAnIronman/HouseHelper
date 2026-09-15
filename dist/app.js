@@ -179,6 +179,8 @@ const initialSleepSettings = normalizeSettings(readStoredObject("hh-sleep-settin
 const initialVacationSettings = normalizeSettings(readStoredObject("hh-vacation-settings"), { enabled: legacyVacationMode, startDate: "", endDate: "", pauseChores: true, pauseHabits: false });
 const initialGoogleSettings = normalizeSettings(readStoredObject("hh-google-calendar"), { clientId: "", owner: "family", days: 60, connected: false, calendars: [], selectedCalendarIds: [], calendarOwners: {}, selectionInitialized: false, lastSync: null });
 const initialReminderSettings = normalizeSettings(readStoredObject("hh-reminder-settings"), { enabled: true, leadMinutes: 15 });
+const initialTimerSettings = normalizeSettings(readStoredObject("hh-timer"), { initialSeconds: 15 * 60, remainingSeconds: 15 * 60, running: false, endsAt: 0 });
+const initialTimerRemaining = initialTimerSettings.running && Number(initialTimerSettings.endsAt) ? Math.max(0, Math.ceil((Number(initialTimerSettings.endsAt) - Date.now()) / 1000)) : Math.max(0, Number(initialTimerSettings.remainingSeconds) || 0);
 
 const storedRewards = readStoredObject("hh-rewards");
 const initialProfile = localStorage.getItem("hh-profile");
@@ -232,9 +234,10 @@ const state = {
   showArchivedArt: false,
   activeArtId: null,
   pendingDelete: null,
-  timerSeconds: 15 * 60,
-  timerInitial: 15 * 60,
-  timerRunning: false,
+  timerSeconds: initialTimerRemaining,
+  timerInitial: Math.max(60, Number(initialTimerSettings.initialSeconds) || 15 * 60),
+  timerRunning: Boolean(initialTimerSettings.running && initialTimerRemaining > 0),
+  timerEndsAt: initialTimerSettings.running && initialTimerRemaining > 0 ? Number(initialTimerSettings.endsAt) : 0,
   timerId: null,
   activeChore: null,
   detailChoreId: null,
@@ -277,6 +280,7 @@ const elements = {
   habitDialog: $("#habitDialog"),
   activityDialog: $("#activityDialog"),
   backupDialog: $("#backupDialog"),
+  connectedDevicesDialog: $("#connectedDevicesDialog"),
   timerDisplay: $("#timerDisplay"),
   calmScreen: $("#calmScreen"),
   toast: $("#toast"),
@@ -330,6 +334,7 @@ function persistSleepSettings() { localStorage.setItem("hh-sleep-settings", JSON
 function persistVacationSettings() { localStorage.setItem("hh-vacation-settings", JSON.stringify(state.vacationSettings)); }
 function persistGoogleSettings() { localStorage.setItem("hh-google-calendar", JSON.stringify(state.googleSettings)); }
 function persistReminderSettings() { localStorage.setItem("hh-reminder-settings", JSON.stringify(state.reminderSettings)); }
+function persistTimer() { localStorage.setItem("hh-timer", JSON.stringify({ initialSeconds: state.timerInitial, remainingSeconds: state.timerSeconds, running: state.timerRunning, endsAt: state.timerEndsAt })); }
 function allChores() { return DEFAULT_CHORES.concat(state.customChores).filter((chore) => !state.removedChoreIds.includes(chore.id)); }
 function currentReward() { return state.rewards[state.rewardOwner]; }
 function rewardOwnerName() { return PROFILES[state.rewardOwner].name; }
@@ -771,8 +776,15 @@ function renderVacationMode() {
 
 function renderConnection() {
   const online = navigator.onLine;
-  $("#connectionLabel").textContent = online ? "Online" : "Offline · changes saved";
-  $("#connectionStatus").classList.toggle("offline", !online);
+  const sync = window.HouseHelperSync && window.HouseHelperSync.status;
+  let label = online ? "Online" : "Offline · changes saved";
+  let offline = !online;
+  if (sync && sync.enabled) {
+    label = sync.connected ? "Household connected · " + Math.max(1, sync.clients.length) + " device" + (sync.clients.length === 1 ? "" : "s") : "Host unavailable · changes saved";
+    offline = !sync.connected;
+  }
+  $("#connectionLabel").textContent = label;
+  $("#connectionStatus").classList.toggle("offline", offline);
 }
 
 function mixHex(color, target, weight) {
@@ -830,6 +842,40 @@ function renderSettingsSummary() {
   $("#profileThemeLabel").textContent = activeTheme.font === "classic" ? "Storybook type · " + activeTheme.scale + " controls" : (activeTheme.font === "clean" ? "Clean type" : "Rounded type") + " · " + activeTheme.scale + " controls";
   $("#sleepWakeLabel").textContent = state.sleepSettings.enabled ? "Sleeps " + formatTime(state.sleepSettings.sleepTime) + " · wakes " + formatTime(state.sleepSettings.wakeTime) : "Automatic sleep is off";
   $("#googleCalendarLabel").textContent = state.googleSettings.connected ? "Last synced " + (state.googleSettings.lastSync ? new Date(state.googleSettings.lastSync).toLocaleString() : "this session") : "Connect shared family schedules";
+  renderConnectedDevices();
+}
+
+function renderConnectedDevices(providedStatus) {
+  const sync = providedStatus || window.HouseHelperSync && window.HouseHelperSync.status;
+  const label = $("#connectedDevicesLabel");
+  if (!sync || !sync.enabled) {
+    label.textContent = "Standalone on this device";
+    $("#deviceHostTitle").textContent = "Standalone on this device";
+    $("#deviceHostCopy").textContent = "This browser is using its own private copy of the household data.";
+    $("#deviceHostStatus").classList.remove("connected", "offline");
+    $("#pairingCard").hidden = true;
+    $("#disconnectDeviceButton").hidden = true;
+    $("#connectedDeviceList").innerHTML = "";
+    $("#deviceConnectionHelp").textContent = "The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.";
+    return;
+  }
+  const count = Math.max(1, sync.clients.length);
+  label.textContent = sync.connected ? (sync.role === "host" ? "Kitchen tablet hosting · " : "Connected to kitchen tablet · ") + count + " online" : "Kitchen tablet is unavailable";
+  $("#deviceHostTitle").textContent = sync.connected ? (sync.role === "host" ? "This is the household host" : "Connected to the kitchen tablet") : "Waiting for the kitchen tablet";
+  $("#deviceHostCopy").textContent = sync.connected ? "Household changes are saved by the host and shared with connected devices." : (sync.error || "Changes remain on this device until the host returns.");
+  $("#deviceHostStatus").classList.toggle("connected", sync.connected);
+  $("#deviceHostStatus").classList.toggle("offline", !sync.connected);
+  $("#connectedDeviceName").value = sync.deviceName || "";
+  $("#pairingCard").hidden = sync.role !== "host" || !sync.inviteUrl;
+  $("#pairingAddress").textContent = sync.inviteUrl || "";
+  $("#disconnectDeviceButton").hidden = sync.role === "host";
+  $("#deviceConnectionHelp").textContent = sync.role === "host" ? "Keep the kitchen tablet connected to your private home Wi-Fi. Secondary devices can reconnect with the same pairing address." : "If the tablet sleeps, restarts, or leaves Wi-Fi, edits stay cached here and resume syncing when it returns.";
+  $("#connectedDeviceList").innerHTML = sync.clients.length ? '<p class="device-list-title">Online now</p>' + sync.clients.map((device) => '<article><span>●</span><div><strong>' + escapeHtml(device.name || "Family device") + '</strong><small>' + (device.id === sync.deviceId ? "This device" : "Synced moments ago") + '</small></div></article>').join("") : '<div class="empty-state compact"><strong>No secondary devices online</strong><span>Open the pairing address on another device.</span></div>';
+}
+
+function openConnectedDevices() {
+  renderConnectedDevices();
+  elements.connectedDevicesDialog.showModal();
 }
 
 function toggleHabit(habitId) {
@@ -1205,22 +1251,63 @@ function checkEventReminders() {
   showEventReminder(candidate.item, candidate.minutes);
 }
 
-function downloadBackup() {
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function exportEvidenceMedia() {
+  const db = await openEvidenceDb();
+  const records = await new Promise((resolve, reject) => {
+    const tx = db.transaction("photos", "readonly");
+    const store = tx.objectStore("photos");
+    const keysRequest = store.getAllKeys();
+    const valuesRequest = store.getAll();
+    tx.oncomplete = () => resolve((keysRequest.result || []).map((key, index) => ({ key: String(key), blob: valuesRequest.result[index] })));
+    tx.onerror = () => reject(tx.error);
+  });
+  const byKey = new Map(records.filter((record) => record.blob).map((record) => [record.key, record.blob]));
+  if (window.HouseHelperSync && window.HouseHelperSync.listMediaKeys) {
+    const remoteKeys = await window.HouseHelperSync.listMediaKeys();
+    for (const key of remoteKeys) if (!byKey.has(key)) {
+      const remote = await window.HouseHelperSync.getMedia(key);
+      if (remote) byKey.set(key, remote);
+    }
+  }
+  return Promise.all([...byKey].map(async ([key, blob]) => ({ key, dataUrl: await blobToDataUrl(blob) })));
+}
+
+async function downloadBackup() {
   const data = {};
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
     if (key && key.startsWith("hh-")) data[key] = localStorage.getItem(key);
   }
-  const payload = { product: "HouseHelper", version: 1, exportedAt: new Date().toISOString(), data: data };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  showToast("Preparing household data and photos…");
+  let media = [];
+  try { media = await exportEvidenceMedia(); } catch {}
+  const payload = { product: "HouseHelper", version: 2, exportedAt: new Date().toISOString(), data: data, media: media };
+  const serialized = JSON.stringify(payload, null, 2);
+  const filename = "househelper-backup-" + datePlus(0) + ".json";
+  if (window.HouseHelperNative && typeof window.HouseHelperNative.saveTextFile === "function") {
+    window.HouseHelperNative.saveTextFile(serialized, filename, "application/json");
+    logActivity("Downloaded a HouseHelper backup", "⇩");
+    showToast("Choose where to save the complete backup");
+    return;
+  }
+  const blob = new Blob([serialized], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "househelper-backup-" + datePlus(0) + ".json";
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   logActivity("Downloaded a HouseHelper backup", "⇩");
-  showToast("Backup downloaded · chore photos are not included");
+  showToast("Complete backup downloaded · " + media.length + " saved photo" + (media.length === 1 ? "" : "s"));
 }
 
 async function restoreBackup(file) {
@@ -1230,6 +1317,13 @@ async function restoreBackup(file) {
     Object.entries(payload.data).forEach(([key, value]) => {
       if (key.startsWith("hh-") && typeof value === "string") localStorage.setItem(key, value);
     });
+    if (Array.isArray(payload.media)) {
+      for (const record of payload.media) {
+        if (!record || typeof record.key !== "string" || typeof record.dataUrl !== "string" || !record.dataUrl.startsWith("data:")) continue;
+        const blob = await (await fetch(record.dataUrl)).blob();
+        await saveEvidence(record.key, blob);
+      }
+    }
     showToast("Backup restored · reloading HouseHelper");
     setTimeout(() => location.reload(), 600);
   } catch {
@@ -1340,7 +1434,7 @@ function openEvidenceDb() {
   });
 }
 
-async function saveEvidence(key, file) {
+async function saveEvidenceLocal(key, file) {
   const db = await openEvidenceDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("photos", "readwrite");
@@ -1350,24 +1444,34 @@ async function saveEvidence(key, file) {
   });
 }
 
+async function saveEvidence(key, file) {
+  await saveEvidenceLocal(key, file);
+  if (window.HouseHelperSync) await window.HouseHelperSync.putMedia(key, file);
+}
+
 async function getEvidence(key) {
   const db = await openEvidenceDb();
-  return new Promise((resolve, reject) => {
+  const local = await new Promise((resolve, reject) => {
     const tx = db.transaction("photos", "readonly");
     const request = tx.objectStore("photos").get(key);
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
+  if (local || !window.HouseHelperSync) return local;
+  const remote = await window.HouseHelperSync.getMedia(key);
+  if (remote) await saveEvidenceLocal(key, remote);
+  return remote;
 }
 
 async function deleteEvidence(key) {
   const db = await openEvidenceDb();
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
     const tx = db.transaction("photos", "readwrite");
     tx.objectStore("photos").delete(key);
     tx.oncomplete = resolve;
     tx.onerror = resolve;
   });
+  if (window.HouseHelperSync) await window.HouseHelperSync.deleteMedia(key);
 }
 
 function openPhotoDialog(item) {
@@ -1911,26 +2015,37 @@ function renderTimer() {
 }
 
 function stopTimer() {
+  if (state.timerRunning && state.timerEndsAt) state.timerSeconds = Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000));
   state.timerRunning = false;
+  state.timerEndsAt = 0;
   clearInterval(state.timerId);
   state.timerId = null;
+  persistTimer();
   renderTimer();
+}
+
+function timerTick() {
+  state.timerSeconds = Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000));
+  renderTimer();
+  if (state.timerSeconds > 0) return;
+  stopTimer();
+  showToast("Family timer finished — check the timer tile!");
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+function startTimerTicker() {
+  clearInterval(state.timerId);
+  timerTick();
+  if (state.timerRunning) state.timerId = setInterval(timerTick, 1000);
 }
 
 function toggleTimer() {
   if (state.timerRunning) return stopTimer();
   if (state.timerSeconds === 0) state.timerSeconds = state.timerInitial;
   state.timerRunning = true;
-  renderTimer();
-  state.timerId = setInterval(() => {
-    state.timerSeconds -= 1;
-    renderTimer();
-    if (state.timerSeconds <= 0) {
-      stopTimer();
-      showToast("Family timer finished — check the timer tile!");
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    }
-  }, 1000);
+  state.timerEndsAt = Date.now() + state.timerSeconds * 1000;
+  persistTimer();
+  startTimerTicker();
 }
 
 function clearCalmSlideshow() {
@@ -2162,6 +2277,7 @@ $("#passcodeForm").addEventListener("submit", async (event) => {
   if (context.action === "google") openGoogleCalendarSettings(parentId);
   if (context.action === "activity") openActivity(parentId);
   if (context.action === "backup") openBackup();
+  if (context.action === "devices") openConnectedDevices();
 });
 
 $("#manageRewardsButton").addEventListener("click", () => openRewardManager(state.rewardOwner));
@@ -2666,6 +2782,7 @@ $$("[data-minutes]").forEach((button) => button.addEventListener("click", () => 
   stopTimer();
   state.timerInitial = Number(button.dataset.minutes) * 60;
   state.timerSeconds = state.timerInitial;
+  persistTimer();
   $$("[data-minutes]").forEach((item) => item.classList.toggle("active", item === button));
   renderTimer();
 }));
@@ -2673,6 +2790,7 @@ $("#timerToggle").addEventListener("click", toggleTimer);
 $("#timerReset").addEventListener("click", () => {
   stopTimer();
   state.timerSeconds = state.timerInitial;
+  persistTimer();
   renderTimer();
 });
 
@@ -2700,6 +2818,10 @@ $("#backupButton").addEventListener("click", () => {
   if (PROFILES[state.profile].adult) openBackup();
   else requestParentAuth({ action: "backup" });
 });
+$("#connectedDevicesButton").addEventListener("click", () => {
+  if (PROFILES[state.profile].adult) openConnectedDevices();
+  else requestParentAuth({ action: "devices" });
+});
 $("#closeActivityButton").addEventListener("click", () => elements.activityDialog.close());
 $("#doneActivityButton").addEventListener("click", () => elements.activityDialog.close());
 $("#activityFilters").addEventListener("click", (event) => {
@@ -2720,6 +2842,25 @@ $("#restoreBackupInput").addEventListener("change", (event) => {
   const file = event.target.files && event.target.files[0];
   if (file) restoreBackup(file);
   event.target.value = "";
+});
+$("#closeConnectedDevicesButton").addEventListener("click", () => elements.connectedDevicesDialog.close());
+$("#doneConnectedDevicesButton").addEventListener("click", () => elements.connectedDevicesDialog.close());
+$("#connectedDeviceName").addEventListener("change", (event) => {
+  if (window.HouseHelperSync) window.HouseHelperSync.rename(event.target.value);
+  renderConnectedDevices();
+});
+$("#copyPairingAddressButton").addEventListener("click", async () => {
+  const address = $("#pairingAddress").textContent;
+  if (!address) return;
+  try {
+    await navigator.clipboard.writeText(address);
+    showToast("Pairing address copied");
+  } catch {
+    showToast("Press and hold the address to copy it");
+  }
+});
+$("#disconnectDeviceButton").addEventListener("click", () => {
+  if (window.HouseHelperSync) window.HouseHelperSync.disconnect();
 });
 $("#closeGoogleCalendarButton").addEventListener("click", () => elements.googleCalendarDialog.close());
 $("#connectGoogleButton").addEventListener("click", () => {
@@ -2767,6 +2908,10 @@ $("#openReminderEventButton").addEventListener("click", () => {
 });
 window.addEventListener("online", renderConnection);
 window.addEventListener("offline", renderConnection);
+window.addEventListener("househelper-sync-status", (event) => {
+  renderConnectedDevices(event.detail);
+  renderConnection();
+});
 setInterval(updateClock, 30000);
 setInterval(updateIdleCountdown, 1000);
 setInterval(checkSleepSchedule, 30000);
@@ -2780,13 +2925,15 @@ document.addEventListener("click", (event) => {
     navigateTo(nav.dataset.view);
   }
 });
-$$(".settings-tile:not(#settingsLayoutButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
+$$(".settings-tile:not(#settingsLayoutButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
 
 selectProfile(state.profile, { quiet: true });
 navigateTo(state.view, { quiet: true });
 renderTimer();
+if (state.timerRunning) startTimerTicker();
+else if (initialTimerSettings.running) persistTimer();
 updateClock();
 renderStorageStatus();
 setTimeout(checkSleepSchedule, 400);

@@ -3,3 +3,12 @@
 node_modules/
 .DS_Store
 Thumbs.db
+.househelper/
+android-host/.gradle/
+android-host/.idea/
+android-host/local.properties
+android-host/**/build/
+android-host/*.iml
+android-host/keystore.properties
+*.jks
+*.keystore
