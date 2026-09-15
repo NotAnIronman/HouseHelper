@@ -100,6 +100,7 @@ public final class MainActivity extends Activity {
 
     private void configureWebView() {
         webView = new WebView(this);
+        webView.clearCache(true);
         webView.setBackgroundColor(Color.rgb(255, 249, 237));
         setContentView(webView, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -368,6 +369,11 @@ public final class MainActivity extends Activity {
     }
 
     private final class NativeBridge {
+        @JavascriptInterface
+        public String getVersion() {
+            return BuildConfig.VERSION_NAME;
+        }
+
         @JavascriptInterface
         public void saveTextFile(String content, String filename, String mimeType) {
             runOnUiThread(() -> beginSave(

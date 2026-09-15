@@ -25,6 +25,7 @@ public final class HostService extends Service {
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener registrationListener;
     private WifiManager.MulticastLock multicastLock;
+    private WifiManager.WifiLock wifiLock;
 
     public static HouseholdServer getServer() {
         return server;
@@ -86,6 +87,9 @@ public final class HostService extends Service {
                 multicastLock = wifiManager.createMulticastLock("househelper-discovery");
                 multicastLock.setReferenceCounted(false);
                 multicastLock.acquire();
+                wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "househelper-host-wifi");
+                wifiLock.setReferenceCounted(false);
+                wifiLock.acquire();
             }
 
             nsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
@@ -118,6 +122,8 @@ public final class HostService extends Service {
         nsdManager = null;
         if (multicastLock != null && multicastLock.isHeld()) multicastLock.release();
         multicastLock = null;
+        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        wifiLock = null;
     }
 
     private void createNotificationChannel() {

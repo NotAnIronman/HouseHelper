@@ -44,6 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class HouseholdServer {
+    public static final String APP_VERSION = "0.2.0";
     private static final int MAX_SYNC_BYTES = 12 * 1024 * 1024;
     private static final int MAX_MEDIA_BYTES = 30 * 1024 * 1024;
     private static final long ACTIVE_CLIENT_MS = 30_000L;
@@ -51,7 +52,7 @@ public final class HouseholdServer {
     private final Context context;
     private final int port;
     private final Object stateLock = new Object();
-    private final ExecutorService workers = Executors.newCachedThreadPool();
+    private final ExecutorService workers = Executors.newFixedThreadPool(8);
     private final Map<String, ClientRecord> clients = new ConcurrentHashMap<>();
     private final File dataRoot;
     private final File mediaRoot;
@@ -122,11 +123,11 @@ public final class HouseholdServer {
     }
 
     public String getHostDashboardUrl() {
-        return "http://127.0.0.1:" + port + "/?pair=" + Uri.encode(getToken()) + "&role=host#home";
+        return "http://127.0.0.1:" + port + "/?pair=" + Uri.encode(getToken()) + "&role=host&v=" + APP_VERSION + "#home";
     }
 
     public String getPairingUrl() {
-        return "http://" + bestLanAddress() + ":" + port + "/?pair=" + Uri.encode(getToken()) + "#home";
+        return "http://" + bestLanAddress() + ":" + port + "/?pair=" + Uri.encode(getToken()) + "&role=secondary&v=" + APP_VERSION + "#home";
     }
 
     private void acceptLoop() {
@@ -168,6 +169,7 @@ public final class HouseholdServer {
                 response.put("product", "HouseHelper LAN");
                 response.put("revision", state.optLong("revision", 0));
             }
+            response.put("version", APP_VERSION);
             response.put("pairedDevices", activeClients().length());
             sendJson(output, 200, response);
             return;
@@ -585,6 +587,9 @@ public final class HouseholdServer {
         StringBuilder builder = new StringBuilder("HTTP/1.1 ").append(status).append(' ').append(reason).append("\r\n");
         builder.append("Connection: close\r\n");
         builder.append("X-Content-Type-Options: nosniff\r\n");
+        builder.append("X-Frame-Options: DENY\r\n");
+        builder.append("Referrer-Policy: no-referrer\r\n");
+        builder.append("X-HouseHelper-Version: ").append(APP_VERSION).append("\r\n");
         for (Map.Entry<String, String> header : headers.entrySet()) {
             builder.append(header.getKey()).append(": ").append(header.getValue()).append("\r\n");
         }
@@ -643,7 +648,7 @@ public final class HouseholdServer {
         if (requestHost.startsWith("127.0.0.1") || requestHost.startsWith("localhost") || requestHost.isEmpty()) {
             return getPairingUrl();
         }
-        return "http://" + requestHost + "/?pair=" + Uri.encode(getToken()) + "#home";
+        return "http://" + requestHost + "/?pair=" + Uri.encode(getToken()) + "&role=secondary&v=" + APP_VERSION + "#home";
     }
 
     private static String bestLanAddress() {
@@ -704,9 +709,12 @@ public final class HouseholdServer {
             String[] parts = firstLine.split(" ", 3);
             if (parts.length < 2) throw new IOException("Invalid request");
             Map<String, String> headers = new HashMap<>();
+            int headerCount = 0;
             while (true) {
                 String line = readLine(input);
                 if (line == null || line.isEmpty()) break;
+                headerCount += 1;
+                if (headerCount > 100) throw new IOException("Too many HTTP headers");
                 int separator = line.indexOf(':');
                 if (separator <= 0) continue;
                 headers.put(line.substring(0, separator).trim().toLowerCase(Locale.ROOT), line.substring(separator + 1).trim());

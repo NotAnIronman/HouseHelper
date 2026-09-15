@@ -53,6 +53,18 @@ The first Gradle sync downloads build tooling and therefore needs internet acces
 
 After the APK opens, go to **Settings → Connected devices**. Other family devices on the same non-guest Wi-Fi can open the displayed pairing address in Safari or Chrome; they do not install the host APK. Keep the pairing address private because it contains the household access token. The Android host's data is app-private, and **Settings → Local data & backup** creates a portable backup including photos.
 
+For dependable overnight hosting, open Android **Settings → Apps → HouseHelper → Battery** and choose **Unrestricted**. Keep Wi-Fi enabled and leave the persistent hosting notification allowed. HouseHelper 0.2.0 also holds a high-performance Wi-Fi lock while its foreground host service is running, which makes reconnecting after the screen sleeps substantially more reliable.
+
+### Updating the tablet after a new commit
+
+1. In Android Studio's **Terminal**, run `git pull` from the repository root.
+2. Wait for Gradle sync if Android Studio starts one. Confirm the run configuration still says `app` and the tablet is selected.
+3. Press **Run**. Android Studio rebuilds the bundled dashboard and installs it over the current debug app; household app data remains in place.
+4. In HouseHelper, open **Settings → Connected devices** and check **App build**. This reliability release shows `0.2.0-debug` on the tablet and `0.2.0` in phone browsers.
+5. On each secondary device, close the old HouseHelper tab and reopen the pairing address shown by the tablet. The connection details should say **Secondary**, and the phone's build and host build should both be 0.2.0.
+
+If the screen still looks unchanged after step 3, uninstalling is not the first choice because it removes the debug app's private household data. First run the app again from Android Studio and use the build label above to verify which APK is actually installed. Make a complete backup before any uninstall or switch between debug and release builds.
+
 To create an installable file later, use **Build → Generate App Bundles or APKs → Generate APKs** for a debug APK, or **Build → Generate Signed App Bundle or APK → APK** for a long-lived release APK. Keep the release keystore and its passwords backed up somewhere private: Android requires the same signing key for future upgrades.
 
 Every relevant push to `main` also runs the free **Build HouseHelper Android APK** GitHub Actions workflow. Its `HouseHelper-debug-apk` artifact is a convenient test installer and expires after 14 days; the repository source does not expire. A personally signed release APK is still the correct long-term family install.
@@ -88,9 +100,21 @@ Important LAN behavior:
 - Shared `hh-*` household records synchronize approximately every 1.2 seconds. Current profile and reminder-dismissal state remain device-specific.
 - Chore evidence and the custom sleep image upload to the host and download on demand.
 - Secondary edits remain in browser storage if the host becomes unavailable, then retry after it returns.
+- Device names are local to each browser. Type the new name and tap **Save name**; incoming sync status cannot overwrite an active edit.
+- **Connected devices** shows the local build, host build, role, and last successful sync. A version mismatch means the secondary browser needs the current pairing address reopened.
 - The pairing address contains a random household token. Use it only on a trusted WPA2/WPA3 home network; do not expose the host port to the internet.
 - Guest Wi-Fi/client isolation can prevent devices from reaching one another.
 - Download a complete backup before seeding a new host.
+
+## Verification
+
+Run the built-in compatibility and UI integrity checks with:
+
+```powershell
+node scripts/self-test.mjs
+```
+
+With npm installed, `npm run check` additionally syntax-checks every browser and host script. The self-test verifies that passcodes hash identically on secure pages and plain local-network HTTP, known Samsung/Apple device identities are normalized, every directly referenced UI control exists, and the web/Android build versions agree.
 
 ## GitHub Pages
 

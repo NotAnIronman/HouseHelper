@@ -3,6 +3,8 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.2.0";
+
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
 }
@@ -285,6 +287,9 @@ const elements = {
   calmScreen: $("#calmScreen"),
   toast: $("#toast"),
 };
+
+let deviceNameDraftDirty = false;
+let authSubmitting = false;
 
 let calmSlideTimer = null;
 let calmObjectUrls = [];
@@ -845,9 +850,21 @@ function renderSettingsSummary() {
   renderConnectedDevices();
 }
 
+function localBuildVersion() {
+  let localVersion = APP_VERSION;
+  try { localVersion = window.HouseHelperNative && window.HouseHelperNative.getVersion ? window.HouseHelperNative.getVersion() : APP_VERSION; } catch {}
+  return localVersion;
+}
+
 function renderConnectedDevices(providedStatus) {
   const sync = providedStatus || window.HouseHelperSync && window.HouseHelperSync.status;
   const label = $("#connectedDevicesLabel");
+  const localVersion = localBuildVersion();
+  $("#deviceBuildLabel").textContent = sync && sync.hostVersion && sync.hostVersion !== APP_VERSION ? localVersion + " · host " + sync.hostVersion : localVersion;
+  $("#deviceRoleLabel").textContent = !sync || !sync.enabled ? "Standalone" : sync.role === "host" ? "Kitchen host" : "Secondary";
+  $("#deviceSyncLabel").textContent = !sync || !sync.connected ? "Not connected" : sync.lastSync ? new Date(sync.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "Connecting…";
+  const nameInput = $("#connectedDeviceName");
+  if (document.activeElement !== nameInput && !deviceNameDraftDirty) nameInput.value = sync && sync.deviceName || localStorage.getItem("hs-device-name") || "Family device";
   if (!sync || !sync.enabled) {
     label.textContent = "Standalone on this device";
     $("#deviceHostTitle").textContent = "Standalone on this device";
@@ -865,17 +882,34 @@ function renderConnectedDevices(providedStatus) {
   $("#deviceHostCopy").textContent = sync.connected ? "Household changes are saved by the host and shared with connected devices." : (sync.error || "Changes remain on this device until the host returns.");
   $("#deviceHostStatus").classList.toggle("connected", sync.connected);
   $("#deviceHostStatus").classList.toggle("offline", !sync.connected);
-  $("#connectedDeviceName").value = sync.deviceName || "";
   $("#pairingCard").hidden = sync.role !== "host" || !sync.inviteUrl;
   $("#pairingAddress").textContent = sync.inviteUrl || "";
   $("#disconnectDeviceButton").hidden = sync.role === "host";
-  $("#deviceConnectionHelp").textContent = sync.role === "host" ? "Keep the kitchen tablet connected to your private home Wi-Fi. Secondary devices can reconnect with the same pairing address." : "If the tablet sleeps, restarts, or leaves Wi-Fi, edits stay cached here and resume syncing when it returns.";
+  const versionMismatch = sync.hostVersion && sync.hostVersion !== APP_VERSION;
+  $("#deviceConnectionHelp").textContent = versionMismatch ? "This device has an older dashboard open. Close this tab, reopen the tablet’s pairing address, then check that both build numbers match." : sync.role === "host" ? "Keep the kitchen tablet connected to your private home Wi-Fi. Secondary devices can reconnect with the same pairing address." : "If the tablet sleeps, restarts, or leaves Wi-Fi, edits stay cached here and resume syncing when it returns.";
   $("#connectedDeviceList").innerHTML = sync.clients.length ? '<p class="device-list-title">Online now</p>' + sync.clients.map((device) => '<article><span>●</span><div><strong>' + escapeHtml(device.name || "Family device") + '</strong><small>' + (device.id === sync.deviceId ? "This device" : "Synced moments ago") + '</small></div></article>').join("") : '<div class="empty-state compact"><strong>No secondary devices online</strong><span>Open the pairing address on another device.</span></div>';
 }
 
 function openConnectedDevices() {
+  deviceNameDraftDirty = false;
   renderConnectedDevices();
   elements.connectedDevicesDialog.showModal();
+}
+
+function saveConnectedDeviceName() {
+  const input = $("#connectedDeviceName");
+  const clean = input.value.trim().slice(0, 50);
+  if (!clean) {
+    showToast("Enter a name for this device");
+    input.focus();
+    return false;
+  }
+  if (window.HouseHelperSync) window.HouseHelperSync.rename(clean);
+  input.value = clean;
+  deviceNameDraftDirty = false;
+  renderConnectedDevices();
+  showToast("Device name saved as " + clean);
+  return true;
 }
 
 function toggleHabit(habitId) {
@@ -1621,22 +1655,21 @@ function sha256HexFallback(bytes) {
 }
 
 async function hashPasscode(parentId, passcode) {
-  const data = new TextEncoder().encode("HouseHelper:" + parentId + ":" + passcode + ":local-parent");
-  if (window.crypto && window.crypto.subtle) {
-    try {
-      const digest = await window.crypto.subtle.digest("SHA-256", data);
-      return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    } catch {}
-  }
-  return sha256HexFallback(data);
+  return window.HouseHelperCompat.hashPasscode(parentId, passcode);
 }
 
 function refreshPasscodeCopy() {
   const parent = PROFILES[state.authParent];
   const creating = !state.passcodes[state.authParent];
   $("#passcodeTitle").textContent = state.authConfirming ? "Confirm " + parent.name + "’s passcode" : creating ? "Create " + parent.name + "’s passcode" : "Enter " + parent.name + "’s passcode";
-  $("#passcodeHelp").textContent = state.authConfirming ? "Enter the same four digits again to confirm." : creating ? "This is the first parent login on this device. Choose four digits, then confirm them." : "Verify " + parent.name + " before continuing.";
-  $$("[data-parent]").forEach((button) => button.classList.toggle("active", button.dataset.parent === state.authParent));
+  $("#passcodeHelp").textContent = state.authConfirming ? "Enter the same four digits again to confirm." : creating ? "This parent does not have a household passcode yet. Choose four digits, then confirm them." : "Verify " + parent.name + " before continuing.";
+  $("#unlockButton").textContent = authSubmitting ? "Checking…" : state.authConfirming ? "Confirm & continue" : "Continue";
+  $("#unlockButton").disabled = authSubmitting;
+  $("#passcodeBuildLabel").textContent = "HouseHelper " + localBuildVersion();
+  $$("[data-parent]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.parent === state.authParent);
+    button.disabled = authSubmitting;
+  });
 }
 
 function requestParentAuth(context) {
@@ -1644,12 +1677,89 @@ function requestParentAuth(context) {
   state.authParent = context.parentId || (PROFILES[state.profile].adult ? state.profile : "tyler");
   state.authConfirming = false;
   state.pendingPasscodeHash = null;
+  authSubmitting = false;
   $("#parentPicker").hidden = context.action === "switch" || PROFILES[state.profile].adult;
   $("#passcodeInput").value = "";
   $("#passcodeError").textContent = "";
   refreshPasscodeCopy();
   elements.passcodeDialog.showModal();
   setTimeout(() => $("#passcodeInput").focus(), 0);
+}
+
+function closeParentAuth() {
+  state.authContext = null;
+  state.authConfirming = false;
+  state.pendingPasscodeHash = null;
+  authSubmitting = false;
+  $("#passcodeInput").value = "";
+  $("#passcodeError").textContent = "";
+  if (elements.passcodeDialog.open) elements.passcodeDialog.close();
+}
+
+async function submitParentAuth() {
+  if (authSubmitting || !state.authContext) return;
+  const input = $("#passcodeInput");
+  const code = input.value.replace(/\D/g, "").slice(0, 4);
+  input.value = code;
+  if (!/^\d{4}$/.test(code)) {
+    $("#passcodeError").textContent = "Enter exactly four numbers.";
+    input.focus();
+    return;
+  }
+
+  authSubmitting = true;
+  $("#passcodeError").textContent = "";
+  refreshPasscodeCopy();
+  const parentId = state.authParent;
+  try {
+    const hash = await hashPasscode(parentId, code);
+    const existing = state.passcodes[parentId];
+    if (!existing && !state.authConfirming) {
+      state.pendingPasscodeHash = hash;
+      state.authConfirming = true;
+      input.value = "";
+      setTimeout(() => input.focus(), 0);
+      return;
+    }
+    if (!existing && hash !== state.pendingPasscodeHash || existing && hash !== existing) {
+      $("#passcodeError").textContent = "That passcode did not match. Try again.";
+      state.authConfirming = false;
+      state.pendingPasscodeHash = null;
+      input.value = "";
+      setTimeout(() => input.focus(), 0);
+      return;
+    }
+    if (!existing) {
+      state.passcodes[parentId] = hash;
+      localStorage.setItem("hh-parent-passcodes", JSON.stringify(state.passcodes));
+    }
+
+    const context = state.authContext;
+    elements.passcodeDialog.close();
+    state.authContext = null;
+    if (context.action === "switch") selectProfile(parentId);
+    if (context.action === "approve") await approveChore(parentId);
+    if (context.action === "redo") await requestNewPhotos(parentId);
+    if (context.action === "deleteChore") await removeChore(context.choreId, parentId);
+    if (context.action === "deleteItem") {
+      if (context.itemType === "chore") await removeChore(context.itemId, parentId);
+      if (context.itemType === "habit") removeHabit(context.itemId, parentId);
+      if (context.itemType === "list") removeListItem(context.itemId, parentId);
+      if (context.itemType === "event") removeCalendarEvent(context.itemId, parentId);
+    }
+    if (context.action === "vacation") openVacationSettings(parentId);
+    if (context.action === "sleep") openSleepSettings(parentId);
+    if (context.action === "google") openGoogleCalendarSettings(parentId);
+    if (context.action === "activity") openActivity(parentId);
+    if (context.action === "backup") openBackup();
+    if (context.action === "devices") openConnectedDevices();
+  } catch (error) {
+    $("#passcodeError").textContent = "Passcode verification could not finish. Please try again.";
+    input.focus();
+  } finally {
+    authSubmitting = false;
+    if (elements.passcodeDialog.open) refreshPasscodeCopy();
+  }
 }
 
 async function approveChore(parentId) {
@@ -2289,56 +2399,15 @@ $("#passcodeInput").addEventListener("input", (event) => {
   $("#passcodeError").textContent = "";
 });
 
-$("#passcodeForm").addEventListener("submit", async (event) => {
-  if (event.submitter && event.submitter.value !== "unlock") return;
+$("#passcodeInput").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
   event.preventDefault();
-  const code = $("#passcodeInput").value;
-  if (!/^\d{4}$/.test(code)) {
-    $("#passcodeError").textContent = "Enter exactly four numbers.";
-    return;
-  }
-  const hash = await hashPasscode(state.authParent, code);
-  const existing = state.passcodes[state.authParent];
-  if (!existing && !state.authConfirming) {
-    state.pendingPasscodeHash = hash;
-    state.authConfirming = true;
-    $("#passcodeInput").value = "";
-    refreshPasscodeCopy();
-    return;
-  }
-  if (!existing && hash !== state.pendingPasscodeHash || existing && hash !== existing) {
-    $("#passcodeError").textContent = "That passcode did not match. Try again.";
-    state.authConfirming = false;
-    state.pendingPasscodeHash = null;
-    $("#passcodeInput").value = "";
-    refreshPasscodeCopy();
-    return;
-  }
-  if (!existing) {
-    state.passcodes[state.authParent] = hash;
-    localStorage.setItem("hh-parent-passcodes", JSON.stringify(state.passcodes));
-  }
-  const context = state.authContext;
-  const parentId = state.authParent;
-  elements.passcodeDialog.close();
-  state.authContext = null;
-  if (context.action === "switch") selectProfile(parentId);
-  if (context.action === "approve") await approveChore(parentId);
-  if (context.action === "redo") await requestNewPhotos(parentId);
-  if (context.action === "deleteChore") await removeChore(context.choreId, parentId);
-  if (context.action === "deleteItem") {
-    if (context.itemType === "chore") await removeChore(context.itemId, parentId);
-    if (context.itemType === "habit") removeHabit(context.itemId, parentId);
-    if (context.itemType === "list") removeListItem(context.itemId, parentId);
-    if (context.itemType === "event") removeCalendarEvent(context.itemId, parentId);
-  }
-  if (context.action === "vacation") openVacationSettings(parentId);
-  if (context.action === "sleep") openSleepSettings(parentId);
-  if (context.action === "google") openGoogleCalendarSettings(parentId);
-  if (context.action === "activity") openActivity(parentId);
-  if (context.action === "backup") openBackup();
-  if (context.action === "devices") openConnectedDevices();
+  submitParentAuth();
 });
+$("#passcodeForm").addEventListener("submit", (event) => { event.preventDefault(); submitParentAuth(); });
+$("#unlockButton").addEventListener("click", submitParentAuth);
+$("#closePasscodeButton").addEventListener("click", closeParentAuth);
+$("#cancelPasscodeButton").addEventListener("click", closeParentAuth);
 
 $("#manageRewardsButton").addEventListener("click", () => openRewardManager(state.rewardOwner));
 $(".reward-kid-tabs").addEventListener("click", (event) => {
@@ -2903,11 +2972,36 @@ $("#restoreBackupInput").addEventListener("change", (event) => {
   if (file) restoreBackup(file);
   event.target.value = "";
 });
-$("#closeConnectedDevicesButton").addEventListener("click", () => elements.connectedDevicesDialog.close());
-$("#doneConnectedDevicesButton").addEventListener("click", () => elements.connectedDevicesDialog.close());
-$("#connectedDeviceName").addEventListener("change", (event) => {
-  if (window.HouseHelperSync) window.HouseHelperSync.rename(event.target.value);
-  renderConnectedDevices();
+$("#closeConnectedDevicesButton").addEventListener("click", () => {
+  deviceNameDraftDirty = false;
+  elements.connectedDevicesDialog.close();
+});
+$("#doneConnectedDevicesButton").addEventListener("click", () => {
+  if (deviceNameDraftDirty && !saveConnectedDeviceName()) return;
+  elements.connectedDevicesDialog.close();
+});
+$("#connectedDeviceName").addEventListener("input", () => {
+  deviceNameDraftDirty = true;
+});
+$("#connectedDeviceName").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  saveConnectedDeviceName();
+});
+$("#saveDeviceNameButton").addEventListener("click", saveConnectedDeviceName);
+$("#refreshDeviceConnectionButton").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Checking…";
+  try {
+    if (window.HouseHelperSync) await window.HouseHelperSync.poll();
+    renderConnectedDevices();
+    showToast(window.HouseHelperSync && window.HouseHelperSync.status.connected ? "Kitchen host is connected" : "Kitchen host is not reachable");
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 });
 $("#copyPairingAddressButton").addEventListener("click", async () => {
   const address = $("#pairingAddress").textContent;
@@ -2987,7 +3081,7 @@ document.addEventListener("click", (event) => {
 });
 $$(".settings-tile:not(#settingsLayoutButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
 
-if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js?v=" + encodeURIComponent(APP_VERSION), { updateViaCache: "none" }).catch(() => {}));
 
 selectProfile(state.profile, { quiet: true });
 navigateTo(state.view, { quiet: true });

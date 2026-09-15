@@ -1,11 +1,11 @@
 {
   "name": "househelper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Touch-first family dashboard and PWA",
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "lan": "node scripts/lan-host.mjs",
-    "check": "node --check dist/app.js && node --check dist/sync.js && node --check dist/service-worker.js && node --check scripts/serve.mjs && node --check scripts/lan-host.mjs"
+    "check": "node --check dist/compat.js && node --check dist/app.js && node --check dist/sync.js && node --check dist/service-worker.js && node --check scripts/serve.mjs && node --check scripts/lan-host.mjs && node scripts/self-test.mjs"
   }
 }

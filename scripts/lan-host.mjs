@@ -7,6 +7,7 @@ import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
+const APP_VERSION = "0.2.0";
 const webRoot = join(projectRoot, "dist");
 const dataRoot = join(projectRoot, ".househelper");
 const mediaRoot = join(dataRoot, "media");
@@ -21,6 +22,12 @@ const types = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json; charset=utf-8",
+};
+const responseHeaders = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "X-HouseHelper-Version": APP_VERSION,
 };
 
 mkdirSync(mediaRoot, { recursive: true });
@@ -50,7 +57,7 @@ function persistSoon() {
 }
 
 function json(response, status, value, headers = {}) {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
+  response.writeHead(status, { ...responseHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
   response.end(JSON.stringify(value));
 }
 
@@ -89,7 +96,7 @@ function inviteUrlFor(request) {
   const requestHost = String(request.headers.host || "");
   const hostname = requestHost.replace(/^\[/, "").split(/\]:|:/)[0];
   const publicHost = hostname === "127.0.0.1" || hostname === "localhost" ? (lanAddresses()[0] || hostname) + ":" + port : requestHost;
-  return "http://" + publicHost + "/?pair=" + encodeURIComponent(household.token) + "#home";
+  return "http://" + publicHost + "/?pair=" + encodeURIComponent(household.token) + "&role=secondary&v=" + APP_VERSION + "#home";
 }
 
 function readBody(request, limit = 12 * 1024 * 1024) {
@@ -116,7 +123,7 @@ function mediaFile(key) {
 
 async function handleApi(request, response, url) {
   if (url.pathname === "/api/health") {
-    json(response, 200, { product: "HouseHelper LAN", revision: household.revision, pairedDevices: activeClients().length });
+    json(response, 200, { product: "HouseHelper LAN", version: APP_VERSION, revision: household.revision, pairedDevices: activeClients().length });
     return true;
   }
   if (!url.pathname.startsWith("/api/")) return false;
@@ -136,14 +143,16 @@ async function handleApi(request, response, url) {
       const payload = JSON.parse((await readBody(request)).toString("utf8"));
       const deviceId = String(request.headers["x-househelper-device"] || "unknown").slice(0, 100);
       const changes = Array.isArray(payload.changes) ? payload.changes : [];
+      let accepted = 0;
       for (const change of changes) {
         if (!change || typeof change.key !== "string" || !change.key.startsWith("hh-") || typeof change.value !== "string") continue;
         if (change.value.length > 10 * 1024 * 1024) continue;
         household.revision += 1;
         household.entries[change.key] = { value: change.value, revision: household.revision, deviceId, updatedAt: new Date().toISOString() };
+        accepted += 1;
       }
       persistSoon();
-      json(response, 200, { revision: household.revision, accepted: changes.length, clients: activeClients(), inviteUrl: inviteUrlFor(request) });
+      json(response, 200, { revision: household.revision, accepted, clients: activeClients(), inviteUrl: inviteUrlFor(request) });
     } catch (error) {
       json(response, 400, { error: error.message || "Invalid synchronization request" });
     }
@@ -180,7 +189,7 @@ async function handleApi(request, response, url) {
         json(response, 404, { error: "Media not found" });
         return true;
       }
-      response.writeHead(200, { "Content-Type": metadata.type || "application/octet-stream", "Content-Length": statSync(path).size, "Cache-Control": "private, max-age=3600" });
+      response.writeHead(200, { ...responseHeaders, "Content-Type": metadata.type || "application/octet-stream", "Content-Length": statSync(path).size, "Cache-Control": "private, max-age=3600" });
       createReadStream(path).pipe(response);
       return true;
     }
@@ -202,6 +211,7 @@ function serveStatic(request, response, url) {
   let filePath = join(webRoot, safePath === "/" ? "index.html" : safePath);
   if (!filePath.startsWith(webRoot) || !existsSync(filePath) || statSync(filePath).isDirectory()) filePath = join(webRoot, "index.html");
   response.writeHead(200, {
+    ...responseHeaders,
     "Content-Type": types[extname(filePath)] || "application/octet-stream",
     "Cache-Control": "no-cache",
   });
@@ -224,8 +234,8 @@ const server = createServer(async (request, response) => {
 server.listen(port, bindAddress, () => {
   const addresses = lanAddresses();
   console.log("HouseHelper LAN host is ready.");
-  console.log(`Host dashboard: http://127.0.0.1:${port}/?pair=${household.token}&role=host#home`);
-  for (const address of addresses) console.log(`Pair another device: http://${address}:${port}/?pair=${household.token}#home`);
+  console.log(`Host dashboard: http://127.0.0.1:${port}/?pair=${household.token}&role=host&v=${APP_VERSION}#home`);
+  for (const address of addresses) console.log(`Pair another device: http://${address}:${port}/?pair=${household.token}&role=secondary&v=${APP_VERSION}#home`);
   console.log("Keep this window open while secondary devices are connected.");
 });
 
