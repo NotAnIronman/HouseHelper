@@ -203,7 +203,7 @@ function serveStatic(request, response, url) {
   if (!filePath.startsWith(webRoot) || !existsSync(filePath) || statSync(filePath).isDirectory()) filePath = join(webRoot, "index.html");
   response.writeHead(200, {
     "Content-Type": types[extname(filePath)] || "application/octet-stream",
-    "Cache-Control": extname(filePath) === ".html" ? "no-cache" : "public, max-age=300",
+    "Cache-Control": "no-cache",
   });
   const stream = createReadStream(filePath);
   stream.on("error", () => response.end("Unable to load HouseHelper."));

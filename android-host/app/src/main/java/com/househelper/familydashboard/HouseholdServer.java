@@ -410,7 +410,7 @@ public final class HouseholdServer {
 
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", contentType(relative));
-        headers.put("Cache-Control", relative.endsWith(".html") ? "no-cache" : "public, max-age=300");
+        headers.put("Cache-Control", "no-cache");
         sendHeaders(output, 200, headers);
         if (!headersOnly) copy(asset, output);
         asset.close();

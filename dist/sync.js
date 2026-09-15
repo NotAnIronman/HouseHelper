@@ -20,7 +20,25 @@
     deviceId = crypto.randomUUID ? crypto.randomUUID() : "device-" + Date.now() + "-" + Math.random().toString(16).slice(2);
     localStorage.setItem(DEVICE_KEY, deviceId);
   }
-  let deviceName = localStorage.getItem(NAME_KEY) || (role === "host" ? "Kitchen tablet" : navigator.platform || "Family device");
+
+  function inferredDeviceName() {
+    if (role === "host") return "Kitchen tablet";
+    const agent = navigator.userAgent || "";
+    const samsungModel = (agent.match(/\bSM-[A-Z0-9]+\b/i) || [])[0] || "";
+    if (/^SM-S938/i.test(samsungModel)) return "Galaxy S25 Ultra";
+    if (/^SM-F966/i.test(samsungModel)) return "Galaxy Z Fold7";
+    if (/^SM-T73[0568]/i.test(samsungModel)) return "Galaxy Tab S7 FE";
+    if (/iPhone/i.test(agent)) return "iPhone";
+    if (/iPad/i.test(agent)) return "iPad";
+    if (/Android/i.test(agent)) return /Mobile/i.test(agent) ? "Android phone" : "Android tablet";
+    if (/Windows/i.test(agent)) return "Windows computer";
+    if (/Macintosh|Mac OS/i.test(agent)) return "Mac";
+    return "Family device";
+  }
+
+  const storedDeviceName = localStorage.getItem(NAME_KEY) || "";
+  const legacyPlatformName = /^(Linux|Win32|MacIntel)(?:\s|$)/i.test(storedDeviceName);
+  let deviceName = storedDeviceName && !legacyPlatformName ? storedDeviceName : inferredDeviceName();
   localStorage.setItem(NAME_KEY, deviceName);
 
   const status = {

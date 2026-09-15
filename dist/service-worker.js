@@ -1,4 +1,4 @@
-const CACHE = "househelper-v16";
+const CACHE = "househelper-v17";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./sync.js", "./manifest.webmanifest", "./favicon.svg"];
 
 self.addEventListener("install", (event) => {
