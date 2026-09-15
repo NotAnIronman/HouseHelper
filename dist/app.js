@@ -3,7 +3,7 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
-const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.5.0";
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.6.0";
 
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -130,6 +130,7 @@ const WIDGETS = [
   { id: "lists", name: "Family list", icon: "☰", detail: "Groceries and shared notes" },
   { id: "attention", name: "Reminders", icon: "!", detail: "Overdue and missed chores" },
   { id: "calendar", name: "Family schedule", icon: "□", detail: "Upcoming calendar items" },
+  { id: "weather", name: "Local weather", icon: "☀", detail: "Current conditions and a three-day outlook" },
   { id: "timer", name: "Quick timer", icon: "◷", detail: "Shared live timer" },
   { id: "art", name: "Art show", icon: "✦", detail: "Family gallery" },
   { id: "learning", name: "Language league", icon: "文", detail: "Long-term learning leaderboard" },
@@ -142,6 +143,7 @@ const BASE_LAYOUT = [
   { id: "lists", size: "half", visible: true },
   { id: "attention", size: "compact", visible: true },
   { id: "calendar", size: "compact", visible: true },
+  { id: "weather", size: "compact", visible: true },
   { id: "timer", size: "compact", visible: true },
   { id: "art", size: "half", visible: true },
   { id: "learning", size: "half", visible: true },
@@ -207,6 +209,7 @@ const initialSleepSettings = normalizeSettings(readStoredObject("hh-sleep-settin
 const initialVacationSettings = normalizeSettings(readStoredObject("hh-vacation-settings"), { enabled: legacyVacationMode, startDate: "", endDate: "", pauseChores: true, pauseHabits: false });
 const initialGoogleSettings = normalizeSettings(readStoredObject("hh-google-calendar"), { clientId: "", owner: "family", days: 60, connected: false, calendars: [], selectedCalendarIds: [], calendarOwners: {}, selectionInitialized: false, lastSync: null });
 const initialReminderSettings = normalizeSettings(readStoredObject("hh-reminder-settings"), { enabled: true, leadMinutes: 15 });
+const initialWeatherSettings = normalizeSettings(readStoredObject("hh-weather-settings"), { location: null, units: "fahrenheit", lastUpdated: null, forecast: null });
 const initialTimerSettings = normalizeSettings(readStoredObject("hh-timer"), { initialSeconds: 15 * 60, remainingSeconds: 15 * 60, running: false, endsAt: 0 });
 const initialTimerRemaining = initialTimerSettings.running && Number(initialTimerSettings.endsAt) ? Math.max(0, Math.ceil((Number(initialTimerSettings.endsAt) - Date.now()) / 1000)) : Math.max(0, Number(initialTimerSettings.remainingSeconds) || 0);
 const storedLearningSettings = readStoredObject("hh-learning-settings");
@@ -246,6 +249,7 @@ const state = {
   habitFilter: "all",
   listItems: readStoredArray("hh-shared-list", clone(DEFAULT_LIST_ITEMS)),
   listFilter: "all",
+  pendingListItem: null,
   familyNote: localStorage.getItem("hh-family-note") || "",
   activity: readStoredArray("hh-activity", []),
   activityFilter: "all",
@@ -271,6 +275,13 @@ const state = {
   activeChore: null,
   detailChoreId: null,
   detailUrls: [],
+  reviewParentId: null,
+  reviewColor: "#ef3f37",
+  reviewDrawing: false,
+  reviewLast: null,
+  reviewBaseImage: null,
+  reviewImageUrl: null,
+  reviewHasMarks: false,
   selectedPhotoFile: null,
   photoUrl: null,
   idleDeadline: null,
@@ -290,6 +301,11 @@ const state = {
   languagePack: initialLearningPack ? initialLearningPack.id : "german",
   languageLevelFilter: ["all", "A1", "A2", "B1"].includes(storedLanguageView.selectedLevel) ? storedLanguageView.selectedLevel : "all",
   languageSession: null,
+  weatherSettings: initialWeatherSettings,
+  weatherDraft: null,
+  weatherSearchResults: [],
+  weatherLoading: false,
+  layoutDrag: null,
   reactionGame: { status: "idle", startedAt: 0, timeoutId: null, best: readStoredNumber("hh-reaction-best", 0) },
   memoryGame: { cards: [], first: null, lock: false, moves: 0, matches: 0 },
 };
@@ -305,6 +321,10 @@ const elements = {
   photoDialog: $("#photoDialog"),
   passcodeDialog: $("#passcodeDialog"),
   choreDetailDialog: $("#choreDetailDialog"),
+  evidenceViewerDialog: $("#evidenceViewerDialog"),
+  redoDialog: $("#redoDialog"),
+  listIdentityDialog: $("#listIdentityDialog"),
+  weatherDialog: $("#weatherDialog"),
   choreFormDialog: $("#choreFormDialog"),
   layoutDialog: $("#layoutDialog"),
   artViewerDialog: $("#artViewerDialog"),
@@ -794,6 +814,112 @@ function applyHomeLayout() {
   });
 }
 
+function widgetDragCandidate(target) {
+  if (state.view !== "home" || target.closest("button,input,select,textarea,a,label,[contenteditable='true']")) return null;
+  return target.closest('.dashboard-grid .card[data-widget]');
+}
+
+function beginWidgetHold(card, x, y, inputType) {
+  if (!card) return;
+  clearTimeout(state.layoutDrag?.timer);
+  const drag = { card, id: card.dataset.widget, startX: x, startY: y, x, y, inputType, active: false, layout: profileLayout(state.profile), timer: null };
+  drag.timer = setTimeout(() => {
+    if (state.layoutDrag !== drag) return;
+    drag.active = true;
+    card.classList.add("widget-dragging");
+    document.body.classList.add("widget-drag-active");
+    try { if (navigator.vibrate) navigator.vibrate(35); } catch {}
+    showToast("Move the widget, then let go to save its position");
+  }, 480);
+  card.classList.add("widget-holding");
+  state.layoutDrag = drag;
+}
+
+function moveWidgetDrag(x, y) {
+  const drag = state.layoutDrag;
+  if (!drag) return;
+  drag.x = x;
+  drag.y = y;
+  if (!drag.active) {
+    if (Math.hypot(x - drag.startX, y - drag.startY) > 12) {
+      clearTimeout(drag.timer);
+      drag.card.classList.remove("widget-holding");
+      state.layoutDrag = null;
+    }
+    return;
+  }
+  drag.card.style.pointerEvents = "none";
+  const target = document.elementFromPoint(x, y)?.closest('.dashboard-grid .card[data-widget]');
+  drag.card.style.pointerEvents = "";
+  if (!target || target === drag.card) return;
+  const from = drag.layout.findIndex((item) => item.id === drag.id);
+  const to = drag.layout.findIndex((item) => item.id === target.dataset.widget);
+  if (from < 0 || to < 0 || from === to) return;
+  const [moved] = drag.layout.splice(from, 1);
+  drag.layout.splice(to, 0, moved);
+  drag.layout.forEach((item, index) => {
+    const widget = $('[data-widget="' + item.id + '"]');
+    if (widget) widget.style.order = index + 1;
+  });
+  target.classList.add("widget-drop-target");
+  setTimeout(() => target.classList.remove("widget-drop-target"), 180);
+}
+
+function finishWidgetDrag(save) {
+  const drag = state.layoutDrag;
+  if (!drag) return;
+  clearTimeout(drag.timer);
+  drag.card.classList.remove("widget-holding", "widget-dragging");
+  document.body.classList.remove("widget-drag-active");
+  state.layoutDrag = null;
+  if (drag.active && save) {
+    state.layouts[state.profile] = clone(drag.layout);
+    localStorage.setItem("hh-layouts", JSON.stringify(state.layouts));
+    state.suppressWidgetClickUntil = Date.now() + 350;
+    applyHomeLayout();
+    logActivity("Moved the " + (WIDGETS.find((widget) => widget.id === drag.id)?.name || "Home") + " widget", "↕", "settings");
+    showToast("Widget position saved for " + PROFILES[state.profile].name);
+  } else {
+    applyHomeLayout();
+  }
+}
+
+function setupWidgetDragging() {
+  const grid = $(".dashboard-grid");
+  grid.addEventListener("touchstart", (event) => {
+    if (event.touches.length !== 1) return;
+    const card = widgetDragCandidate(event.target);
+    if (!card) return;
+    const touch = event.touches[0];
+    beginWidgetHold(card, touch.clientX, touch.clientY, "touch");
+  }, { passive: true });
+  grid.addEventListener("touchmove", (event) => {
+    if (!state.layoutDrag || state.layoutDrag.inputType !== "touch" || !event.touches.length) return;
+    const touch = event.touches[0];
+    moveWidgetDrag(touch.clientX, touch.clientY);
+    if (state.layoutDrag?.active) event.preventDefault();
+  }, { passive: false });
+  grid.addEventListener("touchend", () => finishWidgetDrag(true), { passive: true });
+  grid.addEventListener("touchcancel", () => finishWidgetDrag(false), { passive: true });
+  grid.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch" || event.button !== 0) return;
+    const card = widgetDragCandidate(event.target);
+    if (card) beginWidgetHold(card, event.clientX, event.clientY, "pointer");
+  });
+  document.addEventListener("pointermove", (event) => {
+    if (state.layoutDrag?.inputType === "pointer") moveWidgetDrag(event.clientX, event.clientY);
+  });
+  document.addEventListener("pointerup", () => {
+    if (state.layoutDrag?.inputType === "pointer") finishWidgetDrag(true);
+  });
+  grid.addEventListener("click", (event) => {
+    if (Date.now() < Number(state.suppressWidgetClickUntil || 0)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+}
+
 function renderLayoutEditor() {
   $("#layoutList").innerHTML = state.layoutDraft.map((item, index) => {
     const widget = WIDGETS.find((entry) => entry.id === item.id);
@@ -938,6 +1064,140 @@ function renderConnection() {
   $("#connectionStatus").classList.toggle("offline", offline);
 }
 
+function persistWeatherSettings() {
+  localStorage.setItem("hh-weather-settings", JSON.stringify(state.weatherSettings));
+}
+
+function weatherDescription(code) {
+  if (code === 0) return "Clear sky";
+  if ([1, 2].includes(code)) return "Partly cloudy";
+  if (code === 3) return "Cloudy";
+  if ([45, 48].includes(code)) return "Foggy";
+  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([95, 96, 99].includes(code)) return "Thunderstorms";
+  return "Changing conditions";
+}
+
+function weatherIcon(code, isDay) {
+  if (code === 0) return isDay === 0 ? "🌙" : "☀️";
+  if ([1, 2].includes(code)) return isDay === 0 ? "☁️" : "🌤️";
+  if (code === 3) return "☁️";
+  if ([45, 48].includes(code)) return "🌫️";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
+  if ([95, 96, 99].includes(code)) return "⛈️";
+  return "🌦️";
+}
+
+function renderWeather() {
+  const settings = state.weatherSettings;
+  const location = settings.location;
+  const forecast = settings.forecast;
+  if (!location) {
+    $("#weatherContent").innerHTML = '<button class="weather-empty" data-open-weather type="button"><span>🌤️</span><strong>Add your town</strong><small>Use device location or search by city.</small></button>';
+    $("#weatherAttribution").textContent = "Weather data appears when connected.";
+    return;
+  }
+  if (!forecast) {
+    $("#weatherContent").innerHTML = '<button class="weather-empty" data-refresh-weather type="button"><span>' + (state.weatherLoading ? "↻" : "🌦️") + '</span><strong>' + (state.weatherLoading ? "Loading forecast…" : escapeHtml(location.name)) + '</strong><small>' + (state.weatherLoading ? "Contacting the weather service" : "Tap to try the forecast again") + '</small></button>';
+    $("#weatherAttribution").textContent = "Weather by Open‑Meteo";
+    return;
+  }
+  const unit = forecast.unit || (settings.units === "celsius" ? "°C" : "°F");
+  const days = Array.isArray(forecast.days) ? forecast.days.slice(0, 3) : [];
+  $("#weatherContent").innerHTML = '<div class="weather-now"><span>' + weatherIcon(forecast.code, forecast.isDay) + '</span><div><strong>' + Math.round(forecast.temperature) + unit + '</strong><small>' + escapeHtml(weatherDescription(forecast.code)) + ' · feels ' + Math.round(forecast.apparent) + unit + '</small></div></div><div class="weather-place"><strong>' + escapeHtml(location.name) + '</strong><button data-refresh-weather type="button">' + (state.weatherLoading ? "Refreshing…" : "Refresh") + '</button></div><div class="weather-days">' + days.map((day, index) => '<div><span>' + (index === 0 ? "Today" : new Date(day.date + "T12:00:00").toLocaleDateString([], { weekday: "short" })) + '</span><b>' + weatherIcon(day.code, 1) + '</b><small>' + Math.round(day.high) + '° / ' + Math.round(day.low) + '°</small><em>' + Math.round(day.rain || 0) + '% rain</em></div>').join("") + '</div>';
+  const updated = settings.lastUpdated ? new Date(settings.lastUpdated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "recently";
+  $("#weatherAttribution").textContent = "Weather by Open‑Meteo · updated " + updated + (navigator.onLine ? "" : " · offline copy");
+}
+
+async function fetchWeather(options) {
+  options = options || {};
+  const settings = state.weatherSettings;
+  if (!settings.location || state.weatherLoading) return;
+  state.weatherLoading = true;
+  renderWeather();
+  const location = settings.location;
+  const query = new URLSearchParams({
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
+    current: "temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+    temperature_unit: settings.units === "celsius" ? "celsius" : "fahrenheit",
+    wind_speed_unit: settings.units === "celsius" ? "kmh" : "mph",
+    timezone: "auto",
+    forecast_days: "3",
+  });
+  try {
+    const response = await fetch("https://api.open-meteo.com/v1/forecast?" + query);
+    if (!response.ok) throw new Error("Forecast service returned " + response.status);
+    const payload = await response.json();
+    settings.forecast = {
+      temperature: Number(payload.current.temperature_2m),
+      apparent: Number(payload.current.apparent_temperature),
+      code: Number(payload.current.weather_code),
+      isDay: Number(payload.current.is_day),
+      wind: Number(payload.current.wind_speed_10m),
+      unit: payload.current_units.temperature_2m,
+      days: (payload.daily.time || []).map((date, index) => ({ date, code: Number(payload.daily.weather_code[index]), high: Number(payload.daily.temperature_2m_max[index]), low: Number(payload.daily.temperature_2m_min[index]), rain: Number(payload.daily.precipitation_probability_max[index] || 0) })),
+    };
+    settings.lastUpdated = new Date().toISOString();
+    persistWeatherSettings();
+    if (!options.silent) showToast("Local weather updated");
+  } catch {
+    if (!options.silent) showToast(settings.forecast ? "Could not refresh · showing the saved forecast" : "Weather is unavailable right now");
+  } finally {
+    state.weatherLoading = false;
+    renderWeather();
+  }
+}
+
+function openWeatherSettings() {
+  state.weatherDraft = state.weatherSettings.location ? { ...state.weatherSettings.location } : null;
+  $("#weatherLocationInput").value = state.weatherSettings.location?.name || "";
+  $("#weatherUnitInput").value = state.weatherSettings.units === "celsius" ? "celsius" : "fahrenheit";
+  $("#weatherSearchResults").innerHTML = state.weatherDraft ? '<button class="selected" data-weather-result="current" type="button"><strong>' + escapeHtml(state.weatherDraft.name) + '</strong><small>Current household location</small></button>' : "";
+  $("#saveWeatherLocationButton").disabled = !state.weatherDraft;
+  $("#removeWeatherLocationButton").hidden = !state.weatherSettings.location;
+  elements.weatherDialog.showModal();
+}
+
+async function searchWeatherLocations(term) {
+  const clean = term.trim();
+  if (clean.length < 2) return showToast("Enter at least two letters or a postal code");
+  $("#weatherSearchResults").innerHTML = '<div class="weather-search-status">Searching…</div>';
+  try {
+    const response = await fetch("https://geocoding-api.open-meteo.com/v1/search?" + new URLSearchParams({ name: clean, count: "6", language: "en", format: "json" }));
+    if (!response.ok) throw new Error("Search failed");
+    const payload = await response.json();
+    const results = (Array.isArray(payload.results) ? payload.results : []).filter((result) => Number.isFinite(Number(result.latitude)) && Number.isFinite(Number(result.longitude))).slice(0, 6);
+    state.weatherSearchResults = results.map((result) => ({ name: [result.name, result.admin1, result.country_code].filter(Boolean).join(", "), latitude: Number(result.latitude), longitude: Number(result.longitude) }));
+    $("#weatherSearchResults").innerHTML = results.length ? results.map((result, index) => '<button data-weather-result="' + index + '" type="button"><strong>' + escapeHtml(result.name) + '</strong><small>' + escapeHtml([result.admin1, result.country].filter(Boolean).join(", ")) + '</small></button>').join("") : '<div class="weather-search-status">No matching places found.</div>';
+  } catch {
+    state.weatherSearchResults = [];
+    $("#weatherSearchResults").innerHTML = '<div class="weather-search-status">Location search is unavailable. Check the connection and try again.</div>';
+  }
+}
+
+function chooseDeviceWeatherLocation() {
+  if (!navigator.geolocation) return showToast("Location is not available on this device");
+  const button = $("#useDeviceLocationButton");
+  button.disabled = true;
+  button.querySelector("strong").textContent = "Finding this device…";
+  navigator.geolocation.getCurrentPosition((position) => {
+    state.weatherDraft = { name: "Current location", latitude: Number(position.coords.latitude.toFixed(3)), longitude: Number(position.coords.longitude.toFixed(3)) };
+    $("#weatherSearchResults").innerHTML = '<button class="selected" data-weather-result="current" type="button"><strong>Current location</strong><small>Coordinates received from this device</small></button>';
+    $("#saveWeatherLocationButton").disabled = false;
+    button.disabled = false;
+    button.querySelector("strong").textContent = "Use this device’s location";
+  }, () => {
+    button.disabled = false;
+    button.querySelector("strong").textContent = "Use this device’s location";
+    showToast("Location permission was not available · search by city instead");
+  }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 3600000 });
+}
+
 function mixHex(color, target, weight) {
   const parse = (value) => value.replace("#", "").match(/.{2}/g).map((part) => parseInt(part, 16));
   const from = parse(color);
@@ -1031,6 +1291,14 @@ function renderConnectedDevices(providedStatus) {
   $("#deviceHostStatus").classList.toggle("offline", !sync.connected);
   $("#pairingCard").hidden = sync.role !== "host" || !sync.inviteUrl;
   $("#pairingAddress").textContent = sync.inviteUrl || "";
+  if (sync.role === "host" && sync.inviteUrl && window.HouseHelperQR) {
+    try {
+      window.HouseHelperQR.toCanvas($("#pairingQrCode"), sync.inviteUrl);
+      $("#pairingQrCode").hidden = false;
+    } catch {
+      $("#pairingQrCode").hidden = true;
+    }
+  }
   $("#disconnectDeviceButton").hidden = sync.role === "host";
   const versionMismatch = sync.hostVersion && sync.hostVersion !== APP_VERSION;
   $("#deviceConnectionHelp").textContent = versionMismatch ? "This device has an older dashboard open. Close this tab, reopen the tablet’s pairing address, then check that both build numbers match." : sync.role === "host" ? "Keep the kitchen tablet connected to your private home Wi-Fi. Secondary devices can reconnect with the same pairing address." : "If the tablet sleeps, restarts, or leaves Wi-Fi, edits stay cached here and resume syncing when it returns.";
@@ -1075,14 +1343,44 @@ function toggleHabit(habitId) {
   showToast(index >= 0 ? "Habit reopened" : "Nice work — habit complete!");
 }
 
-function addListItem(text, category) {
+function addListItem(text, category, addedBy) {
   const cleanText = text.trim();
   if (!cleanText) return;
-  state.listItems.unshift({ id: makeId("list"), text: cleanText, category: category || "groceries", completed: false, addedBy: state.profile, createdAt: new Date().toISOString() });
+  const personId = PROFILES[addedBy] && addedBy !== "family" ? addedBy : state.profile;
+  if (!PROFILES[personId] || personId === "family") return;
+  state.listItems.unshift({ id: makeId("list"), text: cleanText, category: category || "groceries", completed: false, addedBy: personId, createdAt: new Date().toISOString() });
   persistListItems();
-  logActivity("Added “" + cleanText + "” to the family list", "☰");
+  logActivity(profileName(personId) + " added “" + cleanText + "” to the family list", "☰", "lists");
   renderLists();
-  showToast("Added to the family list");
+  showToast("Added by " + profileName(personId));
+}
+
+function resetPendingListForm() {
+  if (!state.pendingListItem) return;
+  const form = $("#" + state.pendingListItem.formId);
+  if (form) form.reset();
+}
+
+function finishPendingListItem(personId) {
+  const pending = state.pendingListItem;
+  if (!pending) return;
+  addListItem(pending.text, pending.category, personId);
+  resetPendingListForm();
+  state.pendingListItem = null;
+}
+
+function requestListItem(text, category, formId) {
+  const cleanText = text.trim();
+  if (!cleanText) return;
+  if (state.profile !== "family") {
+    addListItem(cleanText, category, state.profile);
+    const form = $("#" + formId);
+    if (form) form.reset();
+    return;
+  }
+  state.pendingListItem = { text: cleanText, category: category || "groceries", formId };
+  $("#listIdentityPicker").innerHTML = familyConfig.members.map((member) => '<button data-list-identity="' + escapeHtml(member.id) + '" type="button" style="--identity-color:' + member.color + '"><span>' + escapeHtml(member.name.charAt(0).toUpperCase()) + '</span><span><strong>' + escapeHtml(member.name) + '</strong><small>' + escapeHtml(member.role) + (member.adult ? " · passcode required" : "") + '</small></span></button>').join("");
+  elements.listIdentityDialog.showModal();
 }
 
 function toggleListItem(listId) {
@@ -1635,8 +1933,9 @@ function moduleIsUnlocked(personId, pack, moduleIndex) {
   const module = pack.modules[moduleIndex];
   if (module.cards.some((card) => Number(existingLanguageCardProgress(personId, pack.id, card.id)?.reviews) > 0)) return true;
   const previous = pack.modules[moduleIndex - 1];
+  const introduced = previous.cards.filter((card) => Number(existingLanguageCardProgress(personId, pack.id, card.id)?.reviews) > 0).length;
   const retained = previous.cards.filter((card) => cardIsRetained(existingLanguageCardProgress(personId, pack.id, card.id))).length;
-  return retained >= Math.ceil(previous.cards.length * .6);
+  return retained >= 1 || introduced >= Math.min(3, Math.ceil(previous.cards.length * .25));
 }
 
 function persistLanguageProgress() { localStorage.setItem("hh-language-progress", JSON.stringify(state.languageProgress)); }
@@ -1698,7 +1997,7 @@ function renderLearning() {
     const started = module.cards.filter((card) => Number(existingLanguageCardProgress(state.languageProfile, pack.id, card.id)?.reviews) > 0).length;
     const percent = Math.round(retained / module.cards.length * 100);
     const kind = String(module.kind || "foundations").replace(/-/g, " ");
-    return '<article class="language-module' + (unlocked ? "" : " locked") + '"><header><span>' + escapeHtml(module.icon) + '</span><div><small>' + escapeHtml(module.level || "A1") + ' · ' + escapeHtml(kind) + ' · Module ' + (index + 1) + '</small><strong>' + escapeHtml(module.title) + '</strong></div><b>' + (unlocked ? retained + "/" + module.cards.length : "🔒") + '</b></header><p class="module-description">' + escapeHtml(module.description || "Practice useful words and phrases.") + '</p><div class="module-progress"><span style="width:' + percent + '%"></span></div><p class="module-status">' + (unlocked ? mastered + " mastered · " + started + " introduced" : "Retain 60% of the previous module to unlock") + '</p><button data-start-language-module="' + module.id + '" type="button" ' + (unlocked ? "" : "disabled") + '>' + (started ? "Study & review" : "Begin module") + "</button></article>";
+    return '<article class="language-module' + (unlocked ? "" : " locked") + '"><header><span>' + escapeHtml(module.icon) + '</span><div><small>' + escapeHtml(module.level || "A1") + ' · ' + escapeHtml(kind) + ' · Module ' + (index + 1) + '</small><strong>' + escapeHtml(module.title) + '</strong></div><b>' + (unlocked ? retained + "/" + module.cards.length : "🔒") + '</b></header><p class="module-description">' + escapeHtml(module.description || "Practice useful words and phrases.") + '</p><div class="module-progress"><span style="width:' + percent + '%"></span></div><p class="module-status">' + (unlocked ? mastered + " mastered · " + started + " introduced" : "Try at least 3 cards in the previous module to unlock") + '</p><button data-start-language-module="' + module.id + '" type="button" ' + (unlocked ? "" : "disabled") + '>' + (started ? "Study & review" : "Begin module") + "</button></article>";
   }).join("");
   renderLanguageLeaderboard("#languageLeaderboard", false);
   renderLanguageLeaderboard("#homeLanguageLeaderboard", true);
@@ -1761,7 +2060,7 @@ function beginLanguageSession(moduleId) {
     if (!candidates.length) candidates = available.slice(0, Math.min(goal, available.length));
   }
   if (!candidates.length) return showToast("This module has no cards yet");
-  state.languageSession = { packId: pack.id, cards: candidates, index: 0, phase: "", correct: 0, answered: 0, selected: null, question: null };
+  state.languageSession = { packId: pack.id, moduleId: moduleId || null, cards: candidates, index: 0, phase: "", correct: 0, answered: 0, selected: null, question: null };
   prepareLanguageSessionCard();
   elements.languageSessionDialog.showModal();
 }
@@ -1791,6 +2090,16 @@ function renderLanguageSession() {
   $("#languagePracticeButton").hidden = session.phase !== "teach";
   $("#languageNextButton").hidden = !["answered", "complete"].includes(session.phase);
   $("#languageNextButton").textContent = complete ? "Done" : session.index === session.cards.length - 1 ? "Finish" : "Next card";
+  const pack = languagePackById(session.packId);
+  const moduleIndex = session.moduleId ? pack.modules.findIndex((module) => module.id === session.moduleId) : -1;
+  const nextModule = moduleIndex >= 0 ? pack.modules[moduleIndex + 1] : null;
+  $("#continueLanguageButton").hidden = !complete || !nextModule || !moduleIsUnlocked(state.languageProfile, pack, moduleIndex + 1);
+  if (nextModule) {
+    $("#continueLanguageButton").dataset.nextLanguageModule = nextModule.id;
+    $("#continueLanguageButton").textContent = "Continue: " + nextModule.title;
+  } else {
+    delete $("#continueLanguageButton").dataset.nextLanguageModule;
+  }
   $("#hearLanguageButton").hidden = !["teach", "answered"].includes(session.phase);
   $("#languageAnswerBlock").hidden = !["teach", "answered"].includes(session.phase);
   $("#languageChoices").hidden = session.phase !== "question" && session.phase !== "answered";
@@ -1803,7 +2112,6 @@ function renderLanguageSession() {
     $("#languageFeedback").textContent = "Today’s first attempts are saved. Cards return on spaced review days before they can count as retained or mastered.";
     return;
   }
-  const pack = languagePackById(session.packId);
   const card = session.cards[session.index];
   $("#languageSessionEyebrow").textContent = (card.level || "A1") + " · " + String(card.kind || "foundations").replace(/-/g, " ") + " · " + (card.moduleTitle || pack.name);
   $("#languageSessionTitle").textContent = session.phase === "teach" ? "Meet a new card" : "Recall from memory";
@@ -1930,6 +2238,7 @@ function renderAll() {
   renderArt();
   renderHabits();
   renderLists();
+  renderWeather();
   renderVacationMode();
   renderConnection();
   renderSettingsSummary();
@@ -2103,6 +2412,11 @@ async function completePhotoStep(withPhoto) {
     record.status = "pending";
     record.submittedAt = new Date().toISOString();
     record.pointsAwarded = false;
+    record.reviewReason = "";
+    record.returnedBy = "";
+    record.returnedAt = null;
+    record.reviewMarkup = false;
+    await deleteEvidence(id + ":feedback");
     showToast("Submitted for adult approval — points are pending");
   } else {
     record.status = "in-progress";
@@ -2118,17 +2432,27 @@ async function completePhotoStep(withPhoto) {
 }
 
 function displayEvidence(img, empty, blob) {
+  const frame = img.closest("button");
   if (blob) {
     const url = URL.createObjectURL(blob);
     state.detailUrls.push(url);
     img.src = url;
     img.classList.add("visible");
     empty.hidden = true;
+    if (frame) frame.disabled = false;
   } else {
     img.removeAttribute("src");
     img.classList.remove("visible");
     empty.hidden = false;
+    if (frame) frame.disabled = true;
   }
+}
+
+function openEvidenceViewer(source, caption) {
+  if (!source) return;
+  $("#evidenceViewerImage").src = source;
+  $("#evidenceViewerCaption").textContent = caption || "Chore evidence";
+  elements.evidenceViewerDialog.showModal();
 }
 
 async function openChoreDetail(choreId) {
@@ -2141,8 +2465,9 @@ async function openChoreDetail(choreId) {
   state.detailUrls = [];
   $("#detailPerson").textContent = profileName(chore.person) + " · " + chore.area;
   $("#detailTitle").textContent = chore.title;
-  const statusText = status === "pending" ? "Waiting for adult approval · " + (chore.points ? "+" + chore.points + " points pending" : "review needed") : record.approvedBy ? "Approved by " + record.approvedBy : "Completed before photo approvals were enabled";
-  $("#detailStatus").innerHTML = '<span class="status-badge ' + (status === "pending" ? "pending" : "approved") + '">' + escapeHtml(statusText) + "</span>";
+  const returned = status === "in-progress" && record.reviewReason;
+  const statusText = status === "pending" ? "Waiting for adult approval · " + (chore.points ? "+" + chore.points + " points pending" : "review needed") : returned ? "Returned by " + (record.returnedBy || "an adult") + " · another try requested" : record.approvedBy ? "Approved by " + record.approvedBy : "Completed before photo approvals were enabled";
+  $("#detailStatus").innerHTML = '<span class="status-badge ' + (status === "pending" ? "pending" : returned ? "returned" : "approved") + '">' + escapeHtml(statusText) + "</span>";
   const evidenceRequired = chore.photoRequired !== false || chore.points > 0;
   $("#approvalRecord").innerHTML = record.approvedBy ? "<strong>Checked by " + escapeHtml(record.approvedBy) + "</strong><br>" + new Date(record.approvedAt).toLocaleString() : status === "pending" ? evidenceRequired ? "Both photos must be present before points can be approved." : "This chore does not require photo evidence, but an adult still confirms completion." : "No adult verification record is available for this completed chore.";
   const canReview = status === "pending" && canReviewFromCurrentView();
@@ -2150,11 +2475,23 @@ async function openChoreDetail(choreId) {
   const evidenceReady = !evidenceRequired || record.beforePhoto && record.afterPhoto;
   $("#approveChoreButton").disabled = !evidenceReady;
   $("#approveChoreButton").textContent = evidenceReady ? PROFILES[state.profile].adult ? "Approve as " + PROFILES[state.profile].name : "Verify adult & approve" : "Both photos required";
+  $("#choreReviewFeedback").hidden = !returned;
+  $("#reviewFeedbackReason").textContent = returned ? record.reviewReason : "";
+  $("#reviewFeedbackTitle").textContent = returned ? "Returned by " + (record.returnedBy || "an adult") : "Returned for another try";
+  $("#reviewFeedbackImageButton").hidden = true;
   elements.choreDetailDialog.showModal();
   try {
-    const evidence = await Promise.all([getEvidence(choreId + ":before"), getEvidence(choreId + ":after")]);
+    const evidence = await Promise.all([getEvidence(choreId + ":before"), getEvidence(choreId + ":after"), returned && record.reviewMarkup ? getEvidence(choreId + ":feedback") : null]);
     displayEvidence($("#beforeEvidence"), $("#beforeEmpty"), evidence[0]);
     displayEvidence($("#afterEvidence"), $("#afterEmpty"), evidence[1]);
+    if (evidence[2]) {
+      const feedbackUrl = URL.createObjectURL(evidence[2]);
+      state.detailUrls.push(feedbackUrl);
+      $("#reviewFeedbackImage").src = feedbackUrl;
+      $("#reviewFeedbackImageButton").hidden = false;
+    } else {
+      $("#reviewFeedbackImage").removeAttribute("src");
+    }
   } catch {
     showToast("Photo evidence could not be loaded on this device");
   }
@@ -2249,6 +2586,7 @@ function requestParentAuth(context) {
 }
 
 function closeParentAuth() {
+  if (state.authContext && state.authContext.action === "addListItem") state.pendingListItem = null;
   state.authContext = null;
   state.authConfirming = false;
   state.pendingPasscodeHash = null;
@@ -2320,6 +2658,7 @@ async function submitParentAuth() {
     if (context.action === "addChore") openChoreForm(true);
     if (context.action === "manageRewards") openRewardManager(context.rewardOwner, true);
     if (context.action === "languageSettings") openLanguageSettings();
+    if (context.action === "addListItem") finishPendingListItem(parentId);
   } catch (error) {
     $("#passcodeError").textContent = "Passcode verification could not finish. Please try again.";
     input.focus();
@@ -2355,20 +2694,93 @@ async function approveChore(parentId) {
   showToast("Approved by " + record.approvedBy + (chore.points ? " · +" + chore.points + " points" : ""));
 }
 
-async function requestNewPhotos(parentId) {
+function reviewCanvasPoint(event) {
+  const canvas = $("#reviewMarkupCanvas");
+  const rect = canvas.getBoundingClientRect();
+  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+}
+
+function redrawReviewBase() {
+  const canvas = $("#reviewMarkupCanvas");
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  if (state.reviewBaseImage) context.drawImage(state.reviewBaseImage, 0, 0, canvas.width, canvas.height);
+  state.reviewHasMarks = false;
+}
+
+async function openRedoEditor(parentId) {
   const chore = choreById(state.detailChoreId);
   if (!chore) return;
+  const afterPhoto = await getEvidence(chore.id + ":after");
+  if (!afterPhoto) return showToast("An after photo is needed before feedback can be marked up");
+  const imageUrl = URL.createObjectURL(afterPhoto);
+  const image = new Image();
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = imageUrl;
+    });
+  } catch {
+    URL.revokeObjectURL(imageUrl);
+    return showToast("The after photo could not be opened for markup");
+  }
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = $("#reviewMarkupCanvas");
+  canvas.width = Math.max(320, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(240, Math.round(image.naturalHeight * scale));
+  state.reviewParentId = parentId;
+  state.reviewBaseImage = image;
+  state.reviewImageUrl = imageUrl;
+  state.reviewColor = "#ef3f37";
+  state.reviewDrawing = false;
+  $("#redoReasonInput").value = "";
+  $$('[data-review-color]').forEach((button) => button.classList.toggle("active", button.dataset.reviewColor === state.reviewColor));
+  redrawReviewBase();
+  elements.redoDialog.showModal();
+}
+
+async function requestNewPhotos(parentId) {
+  await openRedoEditor(parentId);
+}
+
+async function submitRedoFeedback() {
+  const chore = choreById(state.detailChoreId);
+  const parentId = state.reviewParentId;
+  const reason = $("#redoReasonInput").value.trim();
+  if (!chore || !parentId) return;
+  if (!reason) {
+    showToast("Add a short reason so the learner knows what to fix");
+    $("#redoReasonInput").focus();
+    return;
+  }
   const record = state.chores[chore.id] || {};
+  if (state.reviewHasMarks) {
+    const markup = await new Promise((resolve) => $("#reviewMarkupCanvas").toBlob(resolve, "image/jpeg", .9));
+    if (markup) await saveEvidence(chore.id + ":feedback", markup);
+    record.reviewMarkup = Boolean(markup);
+  } else {
+    await deleteEvidence(chore.id + ":feedback");
+    record.reviewMarkup = false;
+  }
   record.status = "in-progress";
   record.afterPhoto = false;
   record.returnedBy = PROFILES[parentId].name;
+  record.returnedAt = new Date().toISOString();
+  record.reviewReason = reason;
   state.chores[chore.id] = record;
   await deleteEvidence(chore.id + ":after");
   persistChores();
-  logActivity(PROFILES[parentId].name + " requested a new photo for “" + chore.title + "”", "📷", "chores");
+  logActivity(PROFILES[parentId].name + " returned “" + chore.title + "” with written feedback" + (record.reviewMarkup ? " and photo markup" : ""), "↩", "chores");
+  elements.redoDialog.close();
   elements.choreDetailDialog.close();
+  if (state.reviewImageUrl) URL.revokeObjectURL(state.reviewImageUrl);
+  state.reviewImageUrl = null;
+  state.reviewBaseImage = null;
+  state.reviewParentId = null;
   renderAll();
-  showToast(PROFILES[parentId].name + " requested a new after photo");
+  showToast("Feedback sent · a new after photo was requested");
 }
 
 async function removeChore(choreId, parentId) {
@@ -2383,7 +2795,7 @@ async function removeChore(choreId, parentId) {
   }
   delete state.chores[choreId];
   persistChores();
-  await Promise.all([deleteEvidence(choreId + ":before"), deleteEvidence(choreId + ":after")]);
+  await Promise.all([deleteEvidence(choreId + ":before"), deleteEvidence(choreId + ":after"), deleteEvidence(choreId + ":feedback")]);
   logActivity(PROFILES[parentId].name + " removed chore “" + chore.title + "”", "×");
   renderAll();
   showToast(chore.title + " removed by " + PROFILES[parentId].name);
@@ -3008,6 +3420,13 @@ $("#languageNextButton").addEventListener("click", () => {
   state.languageSession.index += 1;
   prepareLanguageSessionCard();
 });
+$("#continueLanguageButton").addEventListener("click", (event) => {
+  const moduleId = event.currentTarget.dataset.nextLanguageModule;
+  if (!moduleId) return;
+  elements.languageSessionDialog.close();
+  state.languageSession = null;
+  beginLanguageSession(moduleId);
+});
 $("#hearLanguageButton").addEventListener("click", speakCurrentLanguageCard);
 $("#closeLanguageSessionButton").addEventListener("click", () => {
   elements.languageSessionDialog.close();
@@ -3204,7 +3623,8 @@ function handleChoreListClick(event) {
     return;
   }
   const item = event.target.closest(".chore-item");
-  if (item && ["pending", "done"].includes(item.dataset.state)) openChoreDetail(item.dataset.choreId);
+  const record = item && state.chores[item.dataset.choreId];
+  if (item && (["pending", "done"].includes(item.dataset.state) || record && record.reviewReason)) openChoreDetail(item.dataset.choreId);
 }
 
 $("#choreList").addEventListener("click", handleChoreListClick);
@@ -3240,6 +3660,16 @@ $("#photoForm").addEventListener("submit", async (event) => {
 });
 
 $("#closeChoreDetail").addEventListener("click", () => elements.choreDetailDialog.close());
+$("#choreDetailDialog").addEventListener("click", (event) => {
+  const evidenceButton = event.target.closest("[data-view-evidence]");
+  if (evidenceButton && !evidenceButton.disabled) {
+    const phase = evidenceButton.dataset.viewEvidence;
+    const image = phase === "before" ? $("#beforeEvidence") : $("#afterEvidence");
+    openEvidenceViewer(image.src, (phase === "before" ? "Before" : "After") + " · " + $("#detailTitle").textContent);
+  }
+});
+$("#reviewFeedbackImageButton").addEventListener("click", () => openEvidenceViewer($("#reviewFeedbackImage").src, "Adult feedback · " + $("#detailTitle").textContent));
+$("#closeEvidenceViewer").addEventListener("click", () => elements.evidenceViewerDialog.close());
 $("#approveChoreButton").addEventListener("click", () => {
   if (PROFILES[state.profile].adult) approveChore(state.profile);
   else requestParentAuth({ action: "approve", choreId: state.detailChoreId });
@@ -3248,6 +3678,55 @@ $("#requestRedoButton").addEventListener("click", () => {
   if (PROFILES[state.profile].adult) requestNewPhotos(state.profile);
   else requestParentAuth({ action: "redo", choreId: state.detailChoreId });
 });
+$$('[data-review-color]').forEach((button) => button.addEventListener("click", () => {
+  state.reviewColor = button.dataset.reviewColor;
+  $$('[data-review-color]').forEach((item) => item.classList.toggle("active", item === button));
+}));
+$("#reviewMarkupCanvas").addEventListener("pointerdown", (event) => {
+  state.reviewDrawing = true;
+  state.reviewLast = reviewCanvasPoint(event);
+  const context = event.currentTarget.getContext("2d");
+  const width = Math.max(4, event.currentTarget.width / 220);
+  context.beginPath();
+  context.arc(state.reviewLast.x, state.reviewLast.y, width / 2, 0, Math.PI * 2);
+  context.fillStyle = state.reviewColor;
+  context.fill();
+  state.reviewHasMarks = true;
+  event.currentTarget.setPointerCapture(event.pointerId);
+});
+$("#reviewMarkupCanvas").addEventListener("pointermove", (event) => {
+  if (!state.reviewDrawing) return;
+  const next = reviewCanvasPoint(event);
+  const context = event.currentTarget.getContext("2d");
+  context.beginPath();
+  context.moveTo(state.reviewLast.x, state.reviewLast.y);
+  context.lineTo(next.x, next.y);
+  context.strokeStyle = state.reviewColor;
+  context.lineWidth = Math.max(4, event.currentTarget.width / 220);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.stroke();
+  state.reviewLast = next;
+  state.reviewHasMarks = true;
+});
+const finishReviewStroke = () => { state.reviewDrawing = false; state.reviewLast = null; };
+$("#reviewMarkupCanvas").addEventListener("pointerup", finishReviewStroke);
+$("#reviewMarkupCanvas").addEventListener("pointercancel", finishReviewStroke);
+$("#clearReviewMarkup").addEventListener("click", redrawReviewBase);
+function closeRedoEditor() {
+  if (elements.redoDialog.open) elements.redoDialog.close();
+  if (state.reviewImageUrl) URL.revokeObjectURL(state.reviewImageUrl);
+  state.reviewImageUrl = null;
+  state.reviewBaseImage = null;
+  state.reviewParentId = null;
+}
+elements.redoDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeRedoEditor();
+});
+$("#closeRedoDialog").addEventListener("click", closeRedoEditor);
+$("#cancelRedoButton").addEventListener("click", closeRedoEditor);
+$("#sendRedoButton").addEventListener("click", submitRedoFeedback);
 
 function requestOpenChoreForm() {
   if (PROFILES[state.profile].adult) openChoreForm();
@@ -3534,13 +4013,23 @@ $("#habitFilters").addEventListener("click", (event) => {
 
 $("#homeListForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  addListItem($("#homeListInput").value, "groceries");
-  event.currentTarget.reset();
+  requestListItem($("#homeListInput").value, "groceries", "homeListForm");
 });
 $("#fullListForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  addListItem($("#fullListInput").value, $("#listCategoryInput").value);
-  event.currentTarget.reset();
+  requestListItem($("#fullListInput").value, $("#listCategoryInput").value, "fullListForm");
+});
+$("#listIdentityPicker").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-list-identity]");
+  if (!button || !state.pendingListItem) return;
+  const personId = button.dataset.listIdentity;
+  elements.listIdentityDialog.close();
+  if (PROFILES[personId].adult) requestParentAuth({ action: "addListItem", parentId: personId });
+  else finishPendingListItem(personId);
+});
+$("#closeListIdentity").addEventListener("click", () => {
+  elements.listIdentityDialog.close();
+  state.pendingListItem = null;
 });
 function handleListClick(event) {
   const remove = event.target.closest("[data-delete-list]");
@@ -3744,6 +4233,52 @@ $("#copyPairingAddressButton").addEventListener("click", async () => {
 $("#disconnectDeviceButton").addEventListener("click", () => {
   if (window.HouseHelperSync) window.HouseHelperSync.disconnect();
 });
+$("#weatherSettingsButton").addEventListener("click", openWeatherSettings);
+$("#weatherContent").addEventListener("click", (event) => {
+  if (event.target.closest("[data-open-weather]")) openWeatherSettings();
+  if (event.target.closest("[data-refresh-weather]")) fetchWeather();
+});
+$("#closeWeatherDialog").addEventListener("click", () => elements.weatherDialog.close());
+$("#weatherSearchForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  searchWeatherLocations($("#weatherLocationInput").value);
+});
+$("#weatherSearchResults").addEventListener("click", (event) => {
+  const result = event.target.closest("[data-weather-result]");
+  if (!result || result.dataset.weatherResult === "current") return;
+  const selected = state.weatherSearchResults[Number(result.dataset.weatherResult)];
+  if (!selected) return;
+  state.weatherDraft = { ...selected };
+  $$("[data-weather-result]", $("#weatherSearchResults")).forEach((button) => button.classList.toggle("selected", button === result));
+  $("#saveWeatherLocationButton").disabled = false;
+});
+$("#useDeviceLocationButton").addEventListener("click", chooseDeviceWeatherLocation);
+$("#saveWeatherLocationButton").addEventListener("click", () => {
+  if (!state.weatherDraft) return;
+  const units = $("#weatherUnitInput").value === "celsius" ? "celsius" : "fahrenheit";
+  const previous = state.weatherSettings.location;
+  const changed = !previous || previous.latitude !== state.weatherDraft.latitude || previous.longitude !== state.weatherDraft.longitude || state.weatherSettings.units !== units;
+  state.weatherSettings.location = { ...state.weatherDraft };
+  state.weatherSettings.units = units;
+  if (changed) {
+    state.weatherSettings.forecast = null;
+    state.weatherSettings.lastUpdated = null;
+  }
+  persistWeatherSettings();
+  elements.weatherDialog.close();
+  renderWeather();
+  fetchWeather();
+  logActivity("Set the household weather location to " + state.weatherDraft.name, "☀", "settings");
+});
+$("#removeWeatherLocationButton").addEventListener("click", () => {
+  state.weatherSettings = { location: null, units: state.weatherSettings.units || "fahrenheit", lastUpdated: null, forecast: null };
+  state.weatherDraft = null;
+  persistWeatherSettings();
+  elements.weatherDialog.close();
+  renderAll();
+  logActivity("Removed the household weather location", "☀", "settings");
+  showToast("Weather location removed");
+});
 $("#closeGoogleCalendarButton").addEventListener("click", () => elements.googleCalendarDialog.close());
 $("#connectGoogleButton").addEventListener("click", () => {
   saveGoogleDialogSettings();
@@ -3788,7 +4323,10 @@ $("#openReminderEventButton").addEventListener("click", () => {
   dismissEventReminder();
   navigateTo("calendar");
 });
-window.addEventListener("online", renderConnection);
+window.addEventListener("online", () => {
+  renderConnection();
+  if (state.weatherSettings.location) fetchWeather({ silent: true });
+});
 window.addEventListener("offline", renderConnection);
 window.addEventListener("househelper-sync-status", (event) => {
   renderConnectedDevices(event.detail);
@@ -3798,6 +4336,7 @@ setInterval(updateClock, 30000);
 setInterval(updateIdleCountdown, 1000);
 setInterval(checkSleepSchedule, 30000);
 setInterval(checkEventReminders, 30000);
+setInterval(() => fetchWeather({ silent: true }), 30 * 60 * 1000);
 ["pointerdown", "keydown", "touchstart"].forEach((eventName) => document.addEventListener(eventName, resetIdleDeadline, { passive: true }));
 document.addEventListener("scroll", resetIdleDeadline, { passive: true });
 document.addEventListener("click", (event) => {
@@ -3811,6 +4350,7 @@ $$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#pro
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js?v=" + encodeURIComponent(APP_VERSION), { updateViaCache: "none" }).catch(() => {}));
 
+setupWidgetDragging();
 renderMemberControls();
 selectProfile(state.profile, { quiet: true });
 navigateTo(state.view, { quiet: true });
@@ -3821,4 +4361,5 @@ updateClock();
 renderStorageStatus();
 setTimeout(checkSleepSchedule, 400);
 setTimeout(checkEventReminders, 900);
+if (state.weatherSettings.location && (!state.weatherSettings.lastUpdated || Date.now() - new Date(state.weatherSettings.lastUpdated).getTime() > 30 * 60 * 1000)) setTimeout(() => fetchWeather({ silent: true }), 1200);
 if (SETUP_REQUIRED) setTimeout(openFamilySetup, 0);

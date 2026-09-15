@@ -7,22 +7,26 @@ import vm from "node:vm";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 await import(new URL("../dist/compat.js", import.meta.url));
+await import(new URL("../dist/qr.js", import.meta.url));
 await import(new URL("../dist/languages.js", import.meta.url));
 await import(new URL("../dist/language-german-b1.js", import.meta.url));
 await import(new URL("../dist/language-korean-b1.js", import.meta.url));
 await import(new URL("../dist/language-world.js", import.meta.url));
+await import(new URL("../dist/language-more.js", import.meta.url));
 const compat = globalThis.HouseHelperCompat;
 const languagePacks = globalThis.HouseHelperLanguagePacks.packs;
 
-assert.equal(compat.VERSION, "0.5.0");
-assert.ok(languagePacks.some((pack) => pack.id === "german" && pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "German must ship with a B1-preparation path");
-assert.ok(languagePacks.some((pack) => pack.id === "korean" && pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "Korean must ship with a B1-preparation path");
+assert.equal(compat.VERSION, "0.6.0");
+assert.ok(languagePacks.every((pack) => pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "every course must ship with a B1-preparation path");
 assert.deepEqual(languagePacks.map((pack) => pack.id), ["german", "korean", "spanish", "french", "japanese", "italian", "mandarin"], "the complete offline course catalog must load in a stable order");
 const languageCards = languagePacks.flatMap((pack) => pack.modules.flatMap((module) => module.cards));
-assert.equal(languageCards.length, 1400, "offline language library must retain its full curriculum");
+assert.equal(languageCards.length, 1652, "offline language library must retain its full curriculum");
 assert.equal(new Set(languageCards.map((card) => card.id)).size, languageCards.length, "language card IDs must be globally unique");
 assert.ok(languagePacks.every((pack) => Array.isArray(pack.levels) && pack.levels.length && pack.modules.every((module) => pack.levels.includes(module.level))), "every language module must have a supported course level");
 assert.ok(languageCards.every((card) => card.level && card.kind && card.prompt && card.answer), "every language card must include level, type, prompt, and answer metadata");
+const qr = globalThis.HouseHelperQR.create("http://192.168.1.2:4173/?pair=test-token&role=secondary#home");
+assert.ok(Array.isArray(qr) && qr.length >= 21 && qr.every((row) => row.length === qr.length && row.every((cell) => typeof cell === "boolean")), "pairing QR generator must return a square boolean matrix");
+assert.deepEqual(globalThis.HouseHelperQR.create("http://192.168.1.2:4173/?pair=test-token&role=secondary#home"), qr, "pairing QR output must be deterministic");
 for (const [person, code] of [["adult-a", "1234"], ["caregiver-b", "0000"], ["adult-a", "9876"]]) {
   const source = `HouseHelper:${person}:${code}:local-parent`;
   const expected = createHash("sha256").update(source).digest("hex");
@@ -42,6 +46,8 @@ const sync = await readFile(join(root, "dist", "sync.js"), "utf8");
 const worker = await readFile(join(root, "dist", "service-worker.js"), "utf8");
 const gradle = await readFile(join(root, "android-host", "app", "build.gradle"), "utf8");
 const server = await readFile(join(root, "android-host", "app", "src", "main", "java", "com", "househelper", "familydashboard", "HouseholdServer.java"), "utf8");
+const manifest = await readFile(join(root, "android-host", "app", "src", "main", "AndroidManifest.xml"), "utf8");
+const mainActivity = await readFile(join(root, "android-host", "app", "src", "main", "java", "com", "househelper", "familydashboard", "MainActivity.java"), "utf8");
 
 assert.match(html, /id="passcodeForm" novalidate/);
 assert.match(html, /id="unlockButton" type="button"/);
@@ -52,14 +58,16 @@ assert.match(html, /id="childMemberEditors"/);
 assert.match(html, /data-app-view="fun"/);
 assert.match(html, /data-app-view="learning"/);
 assert.match(html, /id="languageSessionDialog"/);
-assert.match(html, /languages\.js\?v=0\.5\.0/);
-assert.match(html, /language-german-b1\.js\?v=0\.5\.0/);
-assert.match(html, /language-korean-b1\.js\?v=0\.5\.0/);
-assert.match(html, /language-world\.js\?v=0\.5\.0/);
-assert.match(worker, /languages\.js\?v=0\.5\.0/);
-assert.match(worker, /language-german-b1\.js\?v=0\.5\.0/);
-assert.match(worker, /language-korean-b1\.js\?v=0\.5\.0/);
-assert.match(worker, /language-world\.js\?v=0\.5\.0/);
+assert.match(html, /id="continueLanguageButton"/);
+assert.match(html, /id="redoDialog"/);
+assert.match(html, /id="evidenceViewerDialog"/);
+assert.match(html, /id="listIdentityDialog"/);
+assert.match(html, /id="weatherDialog"/);
+assert.match(html, /id="pairingQrCode"/);
+for (const asset of ["qr", "languages", "language-german-b1", "language-korean-b1", "language-world", "language-more", "app", "sync"]) {
+  assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be loaded by the dashboard");
+  assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be available offline");
+}
 assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/, "service worker must never cache household API responses");
 assert.match(app, /updateViaCache:\s*"none"/, "service worker updates must bypass stale HTTP caches");
 assert.match(sync, /hs-sync-baseline-v1/, "sync baseline must survive reloads so offline edits can retry");
@@ -71,8 +79,19 @@ assert.match(app, /record\.lastReviewDate !== today/, "same-day repetition must 
 assert.match(app, /record\.correctDays\.length >= 5[\s\S]*daysBetween/, "mastery must require recall across at least five days and a multi-week span");
 assert.match(app, /sameKind[\s\S]*sameLevel[\s\S]*ranked/, "quiz distractors must prefer the same card type and course level");
 assert.match(app, /existingLanguageCardProgress/, "viewing the expanded catalog must not create empty progress records");
-assert.match(gradle, /versionName = "0\.5\.0"/);
-assert.match(server, /APP_VERSION = "0\.5\.0"/);
+assert.match(app, /retained >= 1 \|\| introduced >= Math\.min\(3/, "a learner must unlock the next module after meaningfully trying the previous one");
+assert.match(app, /reviewReason/);
+assert.match(app, /chore\.id \+ ":feedback"/);
+assert.match(app, /data-list-identity/);
+assert.match(app, /api\.open-meteo\.com\/v1\/forecast/);
+assert.match(app, /geocoding-api\.open-meteo\.com\/v1\/search/);
+assert.match(app, /beginWidgetHold/);
+assert.match(app, /HouseHelperQR\.toCanvas/);
+assert.match(gradle, /versionName = "0\.6\.0"/);
+assert.match(server, /APP_VERSION = "0\.6\.0"/);
+assert.match(manifest, /android\.permission\.ACCESS_COARSE_LOCATION/);
+assert.match(mainActivity, /onGeolocationPermissionsShowPrompt/);
+assert.match(mainActivity, /setGeolocationEnabled\(true\)/);
 assert.match(app, /const DEFAULT_CHORES = \[\];/);
 assert.match(app, /const DEFAULT_ARTWORKS = \[\];/);
 assert.match(app, /const DEFAULT_EVENTS = \[\];/);
@@ -125,7 +144,7 @@ const context = {
     const payload = options.method === "POST"
       ? { revision: 1, clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" }
       : { revision: 1, entries: [], clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" };
-    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.5.0" : null }, json: async () => payload };
+    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.6.0" : null }, json: async () => payload };
   },
   localStorage: storage,
   location: { hostname: "192.168.1.2", origin: "http://192.168.1.2:4173", pathname: "/", search: "?pair=test-token", reload() {}, assign() {} },

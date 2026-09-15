@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.5.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.0" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -70,6 +70,7 @@
           </div>
           <div class="welcome-actions">
             <button class="customize-button" id="customizeLayoutButton" type="button"><svg><use href="#icon-settings"></use></svg><span>Arrange</span></button>
+            <span class="drag-hint">Hold a widget to move it</span>
             <div class="idle-status" id="idleStatus" hidden><span></span><span>Family view in <strong id="idleCountdown">3:00</strong></span></div>
             <div class="day-score"><span class="score-icon"><svg><use href="#icon-star"></use></svg></span><span><strong id="dayScoreValue">3 chores</strong><small id="dayScoreLabel">done today</small></span></div>
           </div>
@@ -128,6 +129,12 @@
               <button class="text-button" data-view="calendar" type="button">Week <span>›</span></button>
             </div>
             <div class="event-list" id="homeEventList"></div>
+          </section>
+
+          <section class="card weather-card" data-widget="weather" aria-labelledby="weatherTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Right outside</p><h2 id="weatherTitle">Local weather</h2></div><button class="weather-settings-button" id="weatherSettingsButton" type="button" aria-label="Set weather location">⌖</button></div>
+            <div class="weather-content" id="weatherContent"><div class="weather-empty"><span>🌤️</span><strong>Add your town</strong><small>Use device location or search by city.</small></div></div>
+            <p class="weather-attribution" id="weatherAttribution">Weather data appears when connected.</p>
           </section>
 
           <section class="card timer-card" data-widget="timer" aria-labelledby="timerTitle">
@@ -210,7 +217,7 @@
             <div class="daily-learning-action"><strong id="dailyLearningProgress">0 / 5 unique reviews</strong><div class="learning-progress-track"><span id="dailyLearningBar"></span></div><button class="primary-button" id="startDailyLearningButton" type="button">Start daily practice</button></div>
           </section>
           <div class="learning-content-grid">
-            <section><div class="section-heading"><div><p class="eyebrow">Course path</p><h2 id="learningPathTitle">All levels</h2></div><p>Retain 60% of a module before the next one unlocks.</p></div><div class="language-level-filters" id="languageLevelFilters" aria-label="Course level filter"></div><div class="language-module-grid" id="languageModuleGrid"></div></section>
+            <section><div class="section-heading"><div><p class="eyebrow">Course path</p><h2 id="learningPathTitle">All levels</h2></div><p>Try part of a module to open the next one—reviewing over time still builds retention.</p></div><div class="language-level-filters" id="languageLevelFilters" aria-label="Course level filter"></div><div class="language-module-grid" id="languageModuleGrid"></div></section>
             <aside class="language-league-panel"><div class="section-heading"><div><p class="eyebrow">All active learners</p><h2>Family league</h2></div></div><p class="league-explainer">Rankings use retained words—not today’s score—so repetition over time wins over cramming.</p><div class="league-list" id="languageLeaderboard"></div></aside>
           </div>
         </section>
@@ -305,7 +312,7 @@
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
           <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.5.0</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.0</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -317,12 +324,13 @@
         <div class="dialog-body">
           <div class="detail-status" id="detailStatus"></div>
           <div class="evidence-grid">
-            <figure><figcaption>Before</figcaption><div class="evidence-frame"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></div></figure>
-            <figure><figcaption>After</figcaption><div class="evidence-frame"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></div></figure>
+            <figure><figcaption>Before · tap to enlarge</figcaption><button class="evidence-frame" data-view-evidence="before" type="button"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></button></figure>
+            <figure><figcaption>After · tap to enlarge</figcaption><button class="evidence-frame" data-view-evidence="after" type="button"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></button></figure>
           </div>
+          <div class="chore-review-feedback" id="choreReviewFeedback" hidden><div><span>↩</span><div><strong id="reviewFeedbackTitle">Returned for another try</strong><p id="reviewFeedbackReason"></p></div></div><button class="feedback-image-frame" id="reviewFeedbackImageButton" type="button" hidden><img id="reviewFeedbackImage" alt="Adult markup showing what needs attention" /><span>Tap to view adult markup</span></button></div>
           <div class="approval-record" id="approvalRecord"></div>
         </div>
-        <div class="dialog-footer" id="detailActions"><button class="secondary-button request-redo-button" id="requestRedoButton" type="button">Request new photos</button><button class="primary-button" id="approveChoreButton" type="button">Verify adult & approve</button></div>
+        <div class="dialog-footer" id="detailActions"><button class="secondary-button request-redo-button" id="requestRedoButton" type="button">Request changes</button><button class="primary-button" id="approveChoreButton" type="button">Verify adult & approve</button></div>
       </div>
     </dialog>
 
@@ -419,7 +427,7 @@
           <div class="language-choices" id="languageChoices"></div>
           <p class="language-feedback" id="languageFeedback" aria-live="polite"></p>
         </div>
-        <div class="dialog-footer"><button class="secondary-dark-button" id="hearLanguageButton" type="button">🔊 Hear it</button><span class="dialog-spacer"></span><button class="primary-button" id="languagePracticeButton" type="button">Practice from memory</button><button class="primary-button" id="languageNextButton" type="button" hidden>Next card</button></div>
+        <div class="dialog-footer"><button class="secondary-dark-button" id="hearLanguageButton" type="button">🔊 Hear it</button><span class="dialog-spacer"></span><button class="secondary-dark-button" id="continueLanguageButton" type="button" hidden>Continue to next module</button><button class="primary-button" id="languagePracticeButton" type="button">Practice from memory</button><button class="primary-button" id="languageNextButton" type="button" hidden>Next card</button></div>
       </div>
     </dialog>
 
@@ -525,8 +533,8 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.5.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
-          <div class="pairing-card" id="pairingCard" hidden><span>Pairing address</span><strong id="pairingAddress"></strong><p>Open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi‑Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.</p>
         </div>
@@ -558,6 +566,22 @@
       </div>
     </dialog>
 
+    <dialog id="evidenceViewerDialog" class="evidence-viewer-dialog">
+      <div class="evidence-viewer-panel"><button class="art-viewer-close" id="closeEvidenceViewer" type="button" aria-label="Close full-screen chore photo">×</button><img id="evidenceViewerImage" alt="Full-screen chore evidence" /><strong id="evidenceViewerCaption">Chore evidence</strong></div>
+    </dialog>
+
+    <dialog id="redoDialog" class="app-dialog review-markup-dialog">
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Helpful adult feedback</p><h2>Request another try</h2></div><button class="close-button" id="closeRedoDialog" type="button" aria-label="Close feedback editor">×</button></div><div class="dialog-body"><p class="review-markup-help">Circle or underline anything that needs attention. Thin marks are saved over a copy of the submitted after photo.</p><div class="review-canvas-wrap"><canvas id="reviewMarkupCanvas" width="1200" height="800" aria-label="Draw feedback over the submitted chore photo"></canvas></div><div class="review-markup-tools"><span>Markup color</span><button class="active" data-review-color="#ef3f37" style="--review-color:#ef3f37" type="button" aria-label="Red markup"></button><button data-review-color="#ffcc33" style="--review-color:#ffcc33" type="button" aria-label="Yellow markup"></button><button data-review-color="#1677ff" style="--review-color:#1677ff" type="button" aria-label="Blue markup"></button><button class="secondary-dark-button" id="clearReviewMarkup" type="button">Clear marks</button></div><label class="field"><span>What needs another try?</span><textarea id="redoReasonInput" maxlength="300" rows="3" placeholder="Example: Please wipe the lower-left corner and dry the faucet." required></textarea></label></div><div class="dialog-footer"><button class="secondary-button" id="cancelRedoButton" type="button">Cancel</button><button class="primary-button" id="sendRedoButton" type="button">Send feedback</button></div></div>
+    </dialog>
+
+    <dialog id="listIdentityDialog" class="app-dialog identity-dialog">
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Keep the list clear</p><h2>Who is adding this?</h2></div><button class="close-button" id="closeListIdentity" type="button" aria-label="Cancel adding list item">×</button></div><div class="dialog-body"><p class="integration-help">Choose your name so everyone knows who requested the item. Adult names use their passcode.</p><div class="identity-picker" id="listIdentityPicker"></div></div></div>
+    </dialog>
+
+    <dialog id="weatherDialog" class="app-dialog weather-dialog">
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local forecast</p><h2>Set weather location</h2></div><button class="close-button" id="closeWeatherDialog" type="button" aria-label="Close weather settings">×</button></div><div class="dialog-body"><button class="location-button" id="useDeviceLocationButton" type="button"><span>⌖</span><span><strong>Use this device’s location</strong><small>Location is saved only with your household data.</small></span></button><div class="weather-divider"><span>or search</span></div><form class="weather-search-form" id="weatherSearchForm"><label class="field"><span>City or postal code</span><input id="weatherLocationInput" maxlength="80" placeholder="Omaha, Nebraska" autocomplete="postal-code" /></label><button class="secondary-dark-button" type="submit">Find</button></form><div class="weather-search-results" id="weatherSearchResults"></div><label class="field weather-unit-field"><span>Temperature</span><select id="weatherUnitInput"><option value="fahrenheit">Fahrenheit · °F</option><option value="celsius">Celsius · °C</option></select></label><p class="weather-privacy">Forecasts come from Open‑Meteo. The last successful forecast stays available when the dashboard is offline.</p></div><div class="dialog-footer"><button class="danger-button" id="removeWeatherLocationButton" type="button">Remove weather</button><span class="dialog-spacer"></span><button class="primary-button" id="saveWeatherLocationButton" type="button" disabled>Save location</button></div></div>
+    </dialog>
+
     <dialog id="deleteConfirmDialog" class="app-dialog">
       <div class="dialog-panel">
         <div class="dialog-header"><div><p class="eyebrow">Please confirm</p><h2 id="deleteConfirmTitle">Remove this item?</h2></div><button class="close-button" id="closeDeleteConfirm" aria-label="Close" type="button">×</button></div>
@@ -578,12 +602,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.5.0" defer></script>
-    <script src="./languages.js?v=0.5.0" defer></script>
-    <script src="./language-german-b1.js?v=0.5.0" defer></script>
-    <script src="./language-korean-b1.js?v=0.5.0" defer></script>
-    <script src="./language-world.js?v=0.5.0" defer></script>
-    <script src="./app.js?v=0.5.0" defer></script>
-    <script src="./sync.js?v=0.5.0" defer></script>
+    <script src="./compat.js?v=0.6.0" defer></script>
+    <script src="./qr.js?v=0.6.0" defer></script>
+    <script src="./languages.js?v=0.6.0" defer></script>
+    <script src="./language-german-b1.js?v=0.6.0" defer></script>
+    <script src="./language-korean-b1.js?v=0.6.0" defer></script>
+    <script src="./language-world.js?v=0.6.0" defer></script>
+    <script src="./language-more.js?v=0.6.0" defer></script>
+    <script src="./app.js?v=0.6.0" defer></script>
+    <script src="./sync.js?v=0.6.0" defer></script>
   </body>
 </html>

@@ -17,6 +17,7 @@ import android.provider.MediaStore;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -37,6 +38,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_FILE_CHOOSER = 7101;
     private static final int REQUEST_SAVE_BACKUP = 7102;
     private static final int REQUEST_NOTIFICATIONS = 7103;
+    private static final int REQUEST_LOCATION = 7104;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WebView webView;
@@ -45,6 +47,8 @@ public final class MainActivity extends Activity {
     private byte[] pendingDownloadBytes;
     private String pendingDownloadMime = "application/json";
     private boolean loaded;
+    private GeolocationPermissions.Callback pendingGeolocationCallback;
+    private String pendingGeolocationOrigin;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +76,11 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (pendingGeolocationCallback != null) {
+            pendingGeolocationCallback.invoke(pendingGeolocationOrigin, false, false);
+            pendingGeolocationCallback = null;
+            pendingGeolocationOrigin = null;
+        }
         if (webView != null) {
             ViewGroup parent = (ViewGroup) webView.getParent();
             if (parent != null) parent.removeView(webView);
@@ -111,6 +120,7 @@ public final class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setGeolocationEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
@@ -269,6 +279,17 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_LOCATION || pendingGeolocationCallback == null) return;
+        boolean granted = false;
+        for (int result : grantResults) if (result == PackageManager.PERMISSION_GRANTED) granted = true;
+        pendingGeolocationCallback.invoke(pendingGeolocationOrigin, granted, false);
+        pendingGeolocationCallback = null;
+        pendingGeolocationOrigin = null;
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_FILE_CHOOSER) {
@@ -321,6 +342,24 @@ public final class MainActivity extends Activity {
     }
 
     private final class HouseHelperChromeClient extends WebChromeClient {
+        @Override
+        public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+            if (!isLocal(Uri.parse(origin))) {
+                callback.invoke(origin, false, false);
+                return;
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                    || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                callback.invoke(origin, true, false);
+                return;
+            }
+            if (pendingGeolocationCallback != null) pendingGeolocationCallback.invoke(pendingGeolocationOrigin, false, false);
+            pendingGeolocationCallback = callback;
+            pendingGeolocationOrigin = origin;
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION);
+        }
+
         @Override
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
             if (fileChooserCallback != null) fileChooserCallback.onReceiveValue(null);
