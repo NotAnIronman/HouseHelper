@@ -60,7 +60,7 @@
           ["drink", "to drink", "trinken", "TRINK-en", "An infinitive verb."],
           ["tasty", "delicious / tasty", "lecker", "LEK-er", "A common way to praise food."],
         ]),
-        makeModule("de-numbers", "Numbers 1–8", "🔢", [
+        makeModule("de-numbers", "Numbers 1 to 8", "🔢", [
           ["one", "one", "eins", "yns", "The number 1."],
           ["two", "two", "zwei", "tsvy", "The number 2."],
           ["three", "three", "drei", "dry", "The number 3."],
@@ -170,7 +170,7 @@
           ["drink", "to drink", "마시다", "masida", "The dictionary form of the verb."],
           ["delicious", "It’s delicious.", "맛있어요", "masisseoyo", "A polite way to praise food."],
         ]),
-        makeModule("ko-numbers", "Native Korean 1–8", "🔢", [
+        makeModule("ko-numbers", "Native Korean 1 to 8", "🔢", [
           ["one", "one", "하나", "hana", "Native Korean number 1."],
           ["two", "two", "둘", "dul", "Native Korean number 2."],
           ["three", "three", "셋", "set", "Native Korean number 3."],

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#122620" />
-    <meta name="description" content="A touch-first family dashboard for chores, rewards, schedules, timers, and family moments." />
+    <meta name="description" content="A touch-first family dashboard for chores, rewards, schedules, timers, learning, and artwork." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="HouseHelper" />
@@ -82,7 +82,7 @@
             <div class="profile-motif" aria-hidden="true">✿ ✦ ✿</div>
             <div class="card-header">
               <div>
-                <p class="eyebrow">Save & spend</p>
+                <p class="eyebrow">Points balance</p>
                 <h2 id="rewardTitle">Reward shop</h2>
               </div>
               <div class="reward-controls adult-only">
@@ -111,7 +111,7 @@
           </section>
 
           <section class="card habits-card" data-widget="habits" aria-labelledby="habitsWidgetTitle">
-            <div class="card-header compact"><div><p class="eyebrow">Daily rhythm</p><h2 id="habitsWidgetTitle">Habits</h2></div><span class="habit-summary" id="habitSummary">0 / 0</span></div>
+            <div class="card-header compact"><div><p class="eyebrow">Daily routines</p><h2 id="habitsWidgetTitle">Habits</h2></div><span class="habit-summary" id="habitSummary">0 / 0</span></div>
             <div class="home-habit-list" id="homeHabitList"></div>
             <button class="text-button" data-view="habits" type="button">Open routines <span>›</span></button>
           </section>
@@ -132,7 +132,7 @@
           </section>
 
           <section class="card weather-card" data-widget="weather" aria-labelledby="weatherTitle">
-            <div class="card-header compact"><div><p class="eyebrow">Right outside</p><h2 id="weatherTitle">Local weather</h2></div><button class="weather-settings-button" id="weatherSettingsButton" type="button" aria-label="Set weather location">⌖</button></div>
+            <div class="card-header compact"><div><p class="eyebrow">Current conditions</p><h2 id="weatherTitle">Local weather</h2></div><button class="weather-settings-button" id="weatherSettingsButton" type="button" aria-label="Set weather location">⌖</button></div>
             <div class="weather-content" id="weatherContent"><div class="weather-empty"><span>🌤️</span><strong>Add your town</strong><small>Use device location or search by city.</small></div></div>
             <p class="weather-attribution" id="weatherAttribution">Weather data appears when connected.</p>
           </section>
@@ -154,8 +154,8 @@
           </section>
 
           <section class="card language-widget-card" data-widget="learning" aria-labelledby="languageWidgetTitle">
-            <div class="card-header compact"><div><p class="eyebrow">Friendly family challenge</p><h2 id="languageWidgetTitle">Language league</h2></div><span class="language-mark">文</span></div>
-            <p class="language-widget-summary" id="languageWidgetSummary">Start a course to build the family leaderboard.</p>
+            <div class="card-header compact"><div><p class="eyebrow">Family standings</p><h2 id="languageWidgetTitle">Language league</h2></div><span class="language-mark">文</span></div>
+            <p class="language-widget-summary" id="languageWidgetSummary">Start a course to appear on the family leaderboard.</p>
             <div class="league-list compact" id="homeLanguageLeaderboard"></div>
             <button class="text-button" data-view="learning" type="button">Open language learning <span>›</span></button>
           </section>
@@ -163,7 +163,7 @@
         </div>
 
         <section class="app-view full-app-view" id="choresView" data-app-view="chores" hidden>
-          <header class="view-header"><div><p class="eyebrow">Full chore board</p><h1>Chores & approvals</h1><p>Track today’s work, review photo evidence, and catch anything falling behind.</p></div><button class="primary-button adult-only" type="button" id="fullAddChoreButton">+ Add chore</button></header>
+          <header class="view-header"><div><p class="eyebrow">All chores</p><h1>Chores & approvals</h1><p>View assigned chores, due dates, submitted photos, and adult approvals.</p></div><button class="primary-button adult-only" type="button" id="fullAddChoreButton">+ Add chore</button></header>
           <div class="review-queue-panel" id="reviewQueuePanel" hidden><span class="review-symbol">✓</span><div><strong id="reviewQueueTitle">A chore is ready to review</strong><span id="reviewQueueSummary">Open the highlighted chore to compare its photos.</span></div></div>
           <div class="warning-panel" id="warningPanel"><span class="warning-symbol">!</span><div><strong id="warningTitle">2 chores need attention</strong><span id="warningSummary">One is overdue and one has been missed repeatedly.</span></div></div>
           <div class="filter-row" id="choreFilters" aria-label="Filter chores by person"></div>
@@ -183,14 +183,14 @@
         </section>
 
         <section class="app-view full-app-view" id="habitsView" data-app-view="habits" hidden>
-          <header class="view-header"><div><p class="eyebrow">Healthy family rhythms</p><h1>Habits & routines</h1><p>Small daily wins, visible streaks, and gentle resets when life gets busy.</p></div><button class="primary-button" id="addHabitButton" type="button">+ Add habit</button></header>
+          <header class="view-header"><div><p class="eyebrow">Daily routines</p><h1>Habits & routines</h1><p>Track scheduled routines and each person’s current streak.</p></div><button class="primary-button" id="addHabitButton" type="button">+ Add habit</button></header>
           <div class="vacation-banner" id="vacationBanner" hidden><span>☀</span><div><strong>Vacation mode is on</strong><small>Repeating chores are paused. Habits can still be checked voluntarily.</small></div></div>
           <div class="filter-row" id="habitFilters" aria-label="Filter habits by person"></div>
           <div class="habit-board" id="habitBoard"></div>
         </section>
 
         <section class="app-view full-app-view" id="listsView" data-app-view="lists" hidden>
-          <header class="view-header"><div><p class="eyebrow">Shared household memory</p><h1>Family list</h1><p>Groceries, school needs, household supplies, and ideas anyone can capture.</p></div></header>
+          <header class="view-header"><div><p class="eyebrow">Shared lists</p><h1>Family list</h1><p>Add groceries, school items, household supplies, and ideas.</p></div></header>
           <section class="bulletin-card"><div><p class="eyebrow">Pinned family note</p><h2>What everyone should know</h2></div><textarea id="familyNoteInput" maxlength="280" placeholder="Add a note for everyone…"></textarea><button class="primary-button" id="saveFamilyNoteButton" type="button">Save note</button></section>
           <form class="list-composer" id="fullListForm"><input id="fullListInput" maxlength="60" placeholder="What should we remember?" required /><select id="listCategoryInput" aria-label="List category"><option value="groceries">Groceries</option><option value="household">Household</option><option value="school">School</option><option value="ideas">Ideas</option></select><button class="primary-button" type="submit">Add item</button></form>
           <div class="filter-row" id="listFilters" aria-label="Filter shared list"><button class="active" data-list-filter="all" type="button">Everything</button><button data-list-filter="groceries" type="button">Groceries</button><button data-list-filter="household" type="button">Household</button><button data-list-filter="school" type="button">School</button><button data-list-filter="ideas" type="button">Ideas</button><button data-list-filter="done" type="button">Completed</button></div>
@@ -198,12 +198,12 @@
         </section>
 
         <section class="app-view full-app-view" id="artView" data-app-view="art" hidden>
-          <header class="view-header"><div><p class="eyebrow">Made by the family</p><h1>Art show</h1><p>Tap any piece for the full-screen view, or make something new together.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="showArchiveButton" type="button">View archive</button><button class="secondary-dark-button" id="openPaintButton" type="button">🎨 Finger paint</button><label class="primary-upload"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg>Add artwork</label></div></header>
+          <header class="view-header"><div><p class="eyebrow">Family artwork</p><h1>Art show</h1><p>Open artwork full screen, upload a picture, or use finger paint.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="showArchiveButton" type="button">View archive</button><button class="secondary-dark-button" id="openPaintButton" type="button">🎨 Finger paint</button><label class="primary-upload"><input class="sharedArtUpload" type="file" accept="image/*" capture="environment" /><svg><use href="#icon-camera"></use></svg>Add artwork</label></div></header>
           <div class="gallery-grid" id="fullArtWall"></div>
         </section>
 
         <section class="app-view full-app-view" id="learningView" data-app-view="learning" hidden>
-          <header class="view-header learning-view-header"><div><p class="eyebrow">Offline · human-first · no AI</p><h1>Language learning</h1><p>Build useful words and phrases through short lessons, honest recall, and reviews spread across many different days.</p></div><button class="secondary-dark-button adult-only" id="languageSettingsButton" type="button">Learning settings</button></header>
+          <header class="view-header learning-view-header"><div><p class="eyebrow">Offline courses</p><h1>Language learning</h1><p>Study words and phrases, then review them again on later days.</p></div><button class="secondary-dark-button adult-only" id="languageSettingsButton" type="button">Learning settings</button></header>
           <div class="learning-toolbar" aria-label="Language course controls">
             <label><span>Learner</span><select id="languageLearnerSelect"></select></label>
             <label><span>Course</span><select id="languagePackSelect"></select></label>
@@ -213,17 +213,17 @@
             <div class="learning-stat-grid"><div><strong id="learningRetainedCount">0</strong><span>Retained</span></div><div><strong id="learningMasteredCount">0</strong><span>Mastered</span></div><div><strong id="learningDueCount">0</strong><span>Due now</span></div><div><strong id="learningStreakCount">0</strong><span>Day streak</span></div></div>
           </section>
           <section class="daily-learning-card">
-            <div><p class="eyebrow">Today’s steady practice</p><h2>Daily learning goal</h2><p id="dailyLearningCopy">Short, spaced reviews build stronger memory than cramming.</p></div>
+            <div><p class="eyebrow">Today’s practice</p><h2>Daily learning goal</h2><p id="dailyLearningCopy">Reviews are scheduled across multiple days.</p></div>
             <div class="daily-learning-action"><strong id="dailyLearningProgress">0 / 5 unique reviews</strong><div class="learning-progress-track"><span id="dailyLearningBar"></span></div><button class="primary-button" id="startDailyLearningButton" type="button">Start daily practice</button></div>
           </section>
           <div class="learning-content-grid">
-            <section><div class="section-heading"><div><p class="eyebrow">Course path</p><h2 id="learningPathTitle">All levels</h2></div><p>Try part of a module to open the next one—reviewing over time still builds retention.</p></div><div class="language-level-filters" id="languageLevelFilters" aria-label="Course level filter"></div><div class="language-module-grid" id="languageModuleGrid"></div></section>
-            <aside class="language-league-panel"><div class="section-heading"><div><p class="eyebrow">All active learners</p><h2>Family league</h2></div></div><p class="league-explainer">Rankings use retained words—not today’s score—so repetition over time wins over cramming.</p><div class="league-list" id="languageLeaderboard"></div></aside>
+            <section><div class="section-heading"><div><p class="eyebrow">Course path</p><h2 id="learningPathTitle">All levels</h2></div><p>Try at least three cards in a module to open the next one. Retention still requires reviews on later days.</p></div><div class="language-level-filters" id="languageLevelFilters" aria-label="Course level filter"></div><div class="language-module-grid" id="languageModuleGrid"></div></section>
+            <aside class="language-league-panel"><div class="section-heading"><div><p class="eyebrow">All active learners</p><h2>Family league</h2></div></div><p class="league-explainer">Rankings use retained words. A high score from one day does not count as retention.</p><div class="league-list" id="languageLeaderboard"></div></aside>
           </div>
         </section>
 
         <section class="app-view full-app-view" id="funView" data-app-view="fun" hidden>
-          <header class="view-header"><div><p class="eyebrow">A little screen-time fun</p><h1>Family games</h1><p>Quick activities designed for a shared screen—no ads, accounts, or purchases.</p></div></header>
+          <header class="view-header"><div><p class="eyebrow">Family games</p><h1>Games</h1><p>Short games for the shared screen. There are no ads, accounts, or purchases.</p></div></header>
           <div class="fun-grid">
             <section class="fun-card">
               <p class="eyebrow">Speed game</p><h2>Lightning tap</h2><p>Wait for the tile to turn green, then tap as quickly as you can.</p>
@@ -239,7 +239,7 @@
         </section>
 
         <section class="app-view full-app-view" id="settingsView" data-app-view="settings" hidden>
-          <header class="view-header"><div><p class="eyebrow">HouseHelper controls</p><h1>Settings</h1><p>Personalize the kitchen dashboard and family experience.</p></div></header>
+          <header class="view-header"><div><p class="eyebrow">HouseHelper controls</p><h1>Settings</h1><p>Change profiles, layouts, schedules, connections, and local data settings.</p></div></header>
           <div class="settings-grid">
             <button class="settings-tile" id="familyMembersButton" type="button"><span class="settings-icon">⌂</span><span><strong>Household members</strong><small id="familyMembersLabel">Names, roles, colors, and accounts</small></span><b>›</b></button>
             <button class="settings-tile" id="settingsLayoutButton" type="button"><span class="settings-icon"><svg><use href="#icon-settings"></use></svg></span><span><strong>Home layout</strong><small>Resize, reorder, or hide widgets</small></span><b>›</b></button>
@@ -282,7 +282,7 @@
       <form class="dialog-panel setup-panel" id="familySetupForm">
         <div class="dialog-header"><div><p class="eyebrow">Welcome to HouseHelper</p><h2 id="familySetupTitle">Set up your household</h2></div><button class="close-button" id="closeFamilySetupButton" aria-label="Close" type="button">×</button></div>
         <div class="dialog-body">
-          <p class="setup-intro" id="familySetupIntro">Create an adult profile for each parent, grandparent, or caregiver and a child profile for every child. Your dashboard will begin completely blank.</p>
+          <p class="setup-intro" id="familySetupIntro">Create profiles for the adults and children in your household. The dashboard starts empty.</p>
           <label class="field"><span>Household name</span><input id="familyNameInput" maxlength="40" placeholder="The Smith Family" required /></label>
           <div class="setup-section"><div class="setup-section-title"><div><strong>Adults & caregivers</strong><small>Adult profiles can approve chores and manage rewards.</small></div><button class="secondary-button" id="addAdultMemberButton" type="button">+ Add adult</button></div><div class="member-editor-list" id="adultMemberEditors"></div></div>
           <div class="setup-section"><div class="setup-section-title"><div><strong>Children & dependents</strong><small>Add as many as your household needs. This section may be empty.</small></div><button class="secondary-button" id="addChildMemberButton" type="button">+ Add child</button></div><div class="member-editor-list" id="childMemberEditors"></div></div>
@@ -324,8 +324,8 @@
         <div class="dialog-body">
           <div class="detail-status" id="detailStatus"></div>
           <div class="evidence-grid">
-            <figure><figcaption>Before · tap to enlarge</figcaption><button class="evidence-frame" data-view-evidence="before" type="button"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></button></figure>
-            <figure><figcaption>After · tap to enlarge</figcaption><button class="evidence-frame" data-view-evidence="after" type="button"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></button></figure>
+            <figure><figcaption>Before photo. Tap to enlarge.</figcaption><button class="evidence-frame" data-view-evidence="before" type="button"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></button></figure>
+            <figure><figcaption>After photo. Tap to enlarge.</figcaption><button class="evidence-frame" data-view-evidence="after" type="button"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></button></figure>
           </div>
           <div class="chore-review-feedback" id="choreReviewFeedback" hidden><div><span>↩</span><div><strong id="reviewFeedbackTitle">Returned for another try</strong><p id="reviewFeedbackReason"></p></div></div><button class="feedback-image-frame" id="reviewFeedbackImageButton" type="button" hidden><img id="reviewFeedbackImage" alt="Adult markup showing what needs attention" /><span>Tap to view adult markup</span></button></div>
           <div class="approval-record" id="approvalRecord"></div>
@@ -364,7 +364,7 @@
 
     <dialog id="themeDialog" class="app-dialog settings-dialog-wide">
       <form method="dialog" class="dialog-panel" id="themeForm">
-        <div class="dialog-header"><div><p class="eyebrow">Make it yours</p><h2>Profile theme</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Display settings</p><h2>Profile theme</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body">
           <label class="field theme-profile-field"><span>Customize dashboard</span><select id="themeProfileInput"></select></label>
           <p class="field-label">Accent color</p>
@@ -383,7 +383,7 @@
 
     <dialog id="sleepDialog" class="app-dialog settings-dialog-wide">
       <form method="dialog" class="dialog-panel" id="sleepForm">
-        <div class="dialog-header"><div><p class="eyebrow">A calmer kitchen</p><h2>Sleep & wake</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Sleep display</p><h2>Sleep & wake</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body">
           <label class="check-field"><input id="sleepEnabledInput" type="checkbox" checked /><span><strong>Use an automatic sleep schedule</strong><small>The dashboard wakes itself at the chosen morning time.</small></span></label>
           <div class="form-grid"><label class="field"><span>Sleep at</span><input id="sleepTimeInput" type="time" value="21:00" /></label><label class="field"><span>Wake at</span><input id="wakeTimeInput" type="time" value="06:00" /></label></div>
@@ -474,7 +474,7 @@
             <label class="field"><span>Cost</span><input id="rewardTargetInput" type="number" min="10" max="9999" inputmode="numeric" placeholder="75" /></label>
             <label class="field reward-emoji-field"><span>Emoji</span><input id="rewardEmojiInput" maxlength="4" value="🎁" /></label>
           </div>
-          <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Make progress feel reachable.</strong><br /><span id="rewardNoteName">This child</span> earns points only from approved chores.</p></div>
+          <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Points require approval.</strong><br /><span id="rewardNoteName">This child</span> earns points only from approved chores.</p></div>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveRewardButton" value="default" type="submit">Save changes</button></div>
       </form>
@@ -534,9 +534,9 @@
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
           <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
-          <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi‑Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
+          <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi-Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
-          <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi‑Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.</p>
+          <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app runs the household service.</p>
         </div>
         <div class="dialog-footer"><button class="danger-button" id="disconnectDeviceButton" type="button" hidden>Disconnect this device</button><button class="secondary-dark-button" id="refreshDeviceConnectionButton" type="button">Check connection</button><span class="dialog-spacer"></span><button class="primary-button" id="doneConnectedDevicesButton" type="button">Done</button></div>
       </div>
@@ -557,7 +557,7 @@
 
     <dialog id="paintDialog" class="paint-dialog">
       <div class="paint-panel">
-        <div class="paint-header"><div><p class="eyebrow">Finger paint</p><h2>Make something fun</h2></div><button class="close-button" id="closePaintButton" type="button" aria-label="Close painter">×</button></div>
+        <div class="paint-header"><div><p class="eyebrow">Finger paint</p><h2>New painting</h2></div><button class="close-button" id="closePaintButton" type="button" aria-label="Close painter">×</button></div>
         <div class="paint-toolbar" aria-label="Paint colors">
           <div class="paint-colors" id="paintColors"><button class="active" data-color="#ef4444" style="--swatch:#ef4444" type="button" aria-label="Red"></button><button data-color="#facc15" style="--swatch:#facc15" type="button" aria-label="Yellow"></button><button data-color="#2563eb" style="--swatch:#2563eb" type="button" aria-label="Blue"></button><button data-color="#f97316" style="--swatch:#f97316" type="button" aria-label="Orange"></button><button data-color="#22c55e" style="--swatch:#22c55e" type="button" aria-label="Green"></button><button data-color="#9333ea" style="--swatch:#9333ea" type="button" aria-label="Purple"></button><button data-color="#111111" style="--swatch:#111111" type="button" aria-label="Black"></button></div>
           <div class="paint-actions"><button class="secondary-dark-button" id="paintEraser" type="button">Eraser</button><button class="secondary-dark-button" id="clearPaint" type="button">Clear</button><button class="primary-button" id="savePainting" type="button">Save to art show</button></div>
@@ -571,7 +571,7 @@
     </dialog>
 
     <dialog id="redoDialog" class="app-dialog review-markup-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Helpful adult feedback</p><h2>Request another try</h2></div><button class="close-button" id="closeRedoDialog" type="button" aria-label="Close feedback editor">×</button></div><div class="dialog-body"><p class="review-markup-help">Circle or underline anything that needs attention. Thin marks are saved over a copy of the submitted after photo.</p><div class="review-canvas-wrap"><canvas id="reviewMarkupCanvas" width="1200" height="800" aria-label="Draw feedback over the submitted chore photo"></canvas></div><div class="review-markup-tools"><span>Markup color</span><button class="active" data-review-color="#ef3f37" style="--review-color:#ef3f37" type="button" aria-label="Red markup"></button><button data-review-color="#ffcc33" style="--review-color:#ffcc33" type="button" aria-label="Yellow markup"></button><button data-review-color="#1677ff" style="--review-color:#1677ff" type="button" aria-label="Blue markup"></button><button class="secondary-dark-button" id="clearReviewMarkup" type="button">Clear marks</button></div><label class="field"><span>What needs another try?</span><textarea id="redoReasonInput" maxlength="300" rows="3" placeholder="Example: Please wipe the lower-left corner and dry the faucet." required></textarea></label></div><div class="dialog-footer"><button class="secondary-button" id="cancelRedoButton" type="button">Cancel</button><button class="primary-button" id="sendRedoButton" type="button">Send feedback</button></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Chore feedback</p><h2>Request another try</h2></div><button class="close-button" id="closeRedoDialog" type="button" aria-label="Close feedback editor">×</button></div><div class="dialog-body"><p class="review-markup-help">Circle or underline anything that needs attention. Thin marks are saved over a copy of the submitted after photo.</p><div class="review-canvas-wrap"><canvas id="reviewMarkupCanvas" width="1200" height="800" aria-label="Draw feedback over the submitted chore photo"></canvas></div><div class="review-markup-tools"><span>Markup color</span><button class="active" data-review-color="#ef3f37" style="--review-color:#ef3f37" type="button" aria-label="Red markup"></button><button data-review-color="#ffcc33" style="--review-color:#ffcc33" type="button" aria-label="Yellow markup"></button><button data-review-color="#1677ff" style="--review-color:#1677ff" type="button" aria-label="Blue markup"></button><button class="secondary-dark-button" id="clearReviewMarkup" type="button">Clear marks</button></div><label class="field"><span>What needs another try?</span><textarea id="redoReasonInput" maxlength="300" rows="3" placeholder="Example: Please wipe the lower-left corner and dry the faucet." required></textarea></label></div><div class="dialog-footer"><button class="secondary-button" id="cancelRedoButton" type="button">Cancel</button><button class="primary-button" id="sendRedoButton" type="button">Send feedback</button></div></div>
     </dialog>
 
     <dialog id="listIdentityDialog" class="app-dialog identity-dialog">
@@ -579,7 +579,7 @@
     </dialog>
 
     <dialog id="weatherDialog" class="app-dialog weather-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local forecast</p><h2>Set weather location</h2></div><button class="close-button" id="closeWeatherDialog" type="button" aria-label="Close weather settings">×</button></div><div class="dialog-body"><button class="location-button" id="useDeviceLocationButton" type="button"><span>⌖</span><span><strong>Use this device’s location</strong><small>Location is saved only with your household data.</small></span></button><div class="weather-divider"><span>or search</span></div><form class="weather-search-form" id="weatherSearchForm"><label class="field"><span>City or postal code</span><input id="weatherLocationInput" maxlength="80" placeholder="Omaha, Nebraska" autocomplete="postal-code" /></label><button class="secondary-dark-button" type="submit">Find</button></form><div class="weather-search-results" id="weatherSearchResults"></div><label class="field weather-unit-field"><span>Temperature</span><select id="weatherUnitInput"><option value="fahrenheit">Fahrenheit · °F</option><option value="celsius">Celsius · °C</option></select></label><p class="weather-privacy">Forecasts come from Open‑Meteo. The last successful forecast stays available when the dashboard is offline.</p></div><div class="dialog-footer"><button class="danger-button" id="removeWeatherLocationButton" type="button">Remove weather</button><span class="dialog-spacer"></span><button class="primary-button" id="saveWeatherLocationButton" type="button" disabled>Save location</button></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Local forecast</p><h2>Set weather location</h2></div><button class="close-button" id="closeWeatherDialog" type="button" aria-label="Close weather settings">×</button></div><div class="dialog-body"><button class="location-button" id="useDeviceLocationButton" type="button"><span>⌖</span><span><strong>Use this device’s location</strong><small>Location is saved only with your household data.</small></span></button><div class="weather-divider"><span>or search</span></div><form class="weather-search-form" id="weatherSearchForm"><label class="field"><span>City or postal code</span><input id="weatherLocationInput" maxlength="80" placeholder="Omaha, Nebraska" autocomplete="postal-code" /></label><button class="secondary-dark-button" type="submit">Find</button></form><div class="weather-search-results" id="weatherSearchResults"></div><label class="field weather-unit-field"><span>Temperature</span><select id="weatherUnitInput"><option value="fahrenheit">Fahrenheit · °F</option><option value="celsius">Celsius · °C</option></select></label><p class="weather-privacy">Forecasts come from Open-Meteo. The last successful forecast stays available when the dashboard is offline.</p></div><div class="dialog-footer"><button class="danger-button" id="removeWeatherLocationButton" type="button">Remove weather</button><span class="dialog-spacer"></span><button class="primary-button" id="saveWeatherLocationButton" type="button" disabled>Save location</button></div></div>
     </dialog>
 
     <dialog id="deleteConfirmDialog" class="app-dialog">
@@ -594,7 +594,7 @@
       <form method="dialog" class="dialog-panel photo-panel" id="photoForm">
         <div class="dialog-header"><div><p class="eyebrow" id="photoEyebrow">Chore proof</p><h2 id="photoTitle">Add a before photo</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
         <div class="dialog-body">
-          <p class="photo-help" id="photoHelp">Take a quick picture before you begin. It makes the finished result extra satisfying.</p>
+          <p class="photo-help" id="photoHelp">Take a picture before you begin so it can be compared with the finished chore.</p>
           <label class="photo-drop" id="photoDrop"><input id="chorePhoto" type="file" accept="image/*" capture="environment" /><span class="camera-circle"><svg><use href="#icon-camera"></use></svg></span><strong>Take or choose a photo</strong><span>JPG, PNG, or HEIC</span><img id="photoPreview" alt="Selected chore photo preview" /></label>
         </div>
         <div class="dialog-footer"><button class="text-button" id="skipPhotoButton" value="skip" type="submit">Skip for now</button><button class="primary-button" id="savePhotoButton" value="save" type="submit" disabled>Save photo</button></div>

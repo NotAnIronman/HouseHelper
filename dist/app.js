@@ -489,7 +489,7 @@ function saveFamilySetup() {
     return;
   }
   localStorage.setItem(FAMILY_CONFIG_KEY, JSON.stringify(config));
-  showToast("Household saved · loading your private dashboard");
+  showToast("Household saved");
   setTimeout(() => location.reload(), 400);
 }
 function choreStatus(chore) {
@@ -633,7 +633,7 @@ function filteredFullChores() {
 
 function renderFullChores() {
   const filtered = filteredFullChores();
-  $("#fullChoreList").innerHTML = filtered.length ? filtered.map((chore) => choreMarkup(chore, true, true)).join("") : '<div class="empty-state"><strong>No chores yet</strong><span>Use “Add chore” to build a routine that fits your household.</span></div>';
+  $("#fullChoreList").innerHTML = filtered.length ? filtered.map((chore) => choreMarkup(chore, true, true)).join("") : '<div class="empty-state"><strong>No chores yet</strong><span>Use “Add chore” to create the first one.</span></div>';
   $$("[data-chore-filter]").forEach((button) => button.classList.toggle("active", button.dataset.choreFilter === state.choreFilter));
   const warnings = allChores().filter((chore) => warningFor(chore));
   $("#warningTitle").textContent = warnings.length + " " + (warnings.length === 1 ? "chore needs" : "chores need") + " attention";
@@ -1006,9 +1006,9 @@ function renderHabits() {
   const homeHabits = visibleHabits(false);
   const completed = homeHabits.filter(habitDoneToday).length;
   $("#habitSummary").textContent = completed + " / " + homeHabits.length;
-  $("#homeHabitList").innerHTML = homeHabits.length ? homeHabits.slice(0, 4).map((habit) => habitMarkup(habit, false)).join("") : '<div class="empty-state compact"><strong>No routines due today</strong><span>Enjoy the breathing room.</span></div>';
+  $("#homeHabitList").innerHTML = homeHabits.length ? homeHabits.slice(0, 4).map((habit) => habitMarkup(habit, false)).join("") : '<div class="empty-state compact"><strong>No routines due today</strong><span>Nothing is scheduled.</span></div>';
   const fullHabits = visibleHabits(true);
-  $("#habitBoard").innerHTML = fullHabits.length ? fullHabits.map((habit) => habitMarkup(habit, true)).join("") : '<div class="empty-state"><strong>No habits here yet</strong><span>Tap “Add habit” to build a gentle family routine.</span></div>';
+  $("#habitBoard").innerHTML = fullHabits.length ? fullHabits.map((habit) => habitMarkup(habit, true)).join("") : '<div class="empty-state"><strong>No habits here yet</strong><span>Tap “Add habit” to create one.</span></div>';
   $$('[data-habit-filter]').forEach((button) => {
     button.classList.toggle("active", button.dataset.habitFilter === state.habitFilter);
     button.hidden = isChildProfile(state.profile) && button.dataset.habitFilter !== state.profile;
@@ -1102,14 +1102,14 @@ function renderWeather() {
   }
   if (!forecast) {
     $("#weatherContent").innerHTML = '<button class="weather-empty" data-refresh-weather type="button"><span>' + (state.weatherLoading ? "↻" : "🌦️") + '</span><strong>' + (state.weatherLoading ? "Loading forecast…" : escapeHtml(location.name)) + '</strong><small>' + (state.weatherLoading ? "Contacting the weather service" : "Tap to try the forecast again") + '</small></button>';
-    $("#weatherAttribution").textContent = "Weather by Open‑Meteo";
+    $("#weatherAttribution").textContent = "Weather by Open-Meteo";
     return;
   }
   const unit = forecast.unit || (settings.units === "celsius" ? "°C" : "°F");
   const days = Array.isArray(forecast.days) ? forecast.days.slice(0, 3) : [];
   $("#weatherContent").innerHTML = '<div class="weather-now"><span>' + weatherIcon(forecast.code, forecast.isDay) + '</span><div><strong>' + Math.round(forecast.temperature) + unit + '</strong><small>' + escapeHtml(weatherDescription(forecast.code)) + ' · feels ' + Math.round(forecast.apparent) + unit + '</small></div></div><div class="weather-place"><strong>' + escapeHtml(location.name) + '</strong><button data-refresh-weather type="button">' + (state.weatherLoading ? "Refreshing…" : "Refresh") + '</button></div><div class="weather-days">' + days.map((day, index) => '<div><span>' + (index === 0 ? "Today" : new Date(day.date + "T12:00:00").toLocaleDateString([], { weekday: "short" })) + '</span><b>' + weatherIcon(day.code, 1) + '</b><small>' + Math.round(day.high) + '° / ' + Math.round(day.low) + '°</small><em>' + Math.round(day.rain || 0) + '% rain</em></div>').join("") + '</div>';
   const updated = settings.lastUpdated ? new Date(settings.lastUpdated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "recently";
-  $("#weatherAttribution").textContent = "Weather by Open‑Meteo · updated " + updated + (navigator.onLine ? "" : " · offline copy");
+  $("#weatherAttribution").textContent = "Weather by Open-Meteo. Updated " + updated + (navigator.onLine ? "" : ". Offline copy");
 }
 
 async function fetchWeather(options) {
@@ -1146,7 +1146,7 @@ async function fetchWeather(options) {
     persistWeatherSettings();
     if (!options.silent) showToast("Local weather updated");
   } catch {
-    if (!options.silent) showToast(settings.forecast ? "Could not refresh · showing the saved forecast" : "Weather is unavailable right now");
+    if (!options.silent) showToast(settings.forecast ? "Could not refresh. Showing the saved forecast." : "Weather is unavailable right now");
   } finally {
     state.weatherLoading = false;
     renderWeather();
@@ -1194,7 +1194,7 @@ function chooseDeviceWeatherLocation() {
   }, () => {
     button.disabled = false;
     button.querySelector("strong").textContent = "Use this device’s location";
-    showToast("Location permission was not available · search by city instead");
+    showToast("Location permission was not available. Search by city instead.");
   }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 3600000 });
 }
 
@@ -1280,7 +1280,7 @@ function renderConnectedDevices(providedStatus) {
     $("#pairingCard").hidden = true;
     $("#disconnectDeviceButton").hidden = true;
     $("#connectedDeviceList").innerHTML = "";
-    $("#deviceConnectionHelp").textContent = "The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app will run the household service; this page is ready to connect to it.";
+    $("#deviceConnectionHelp").textContent = "The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app runs the household service.";
     return;
   }
   const count = Math.max(1, sync.clients.length);
@@ -1340,7 +1340,7 @@ function toggleHabit(habitId) {
   persistHabitCompletions();
   logActivity((index >= 0 ? "Unchecked " : "Completed ") + habit.name + " for " + profileName(habit.person), habit.icon);
   renderHabits();
-  showToast(index >= 0 ? "Habit reopened" : "Nice work — habit complete!");
+  showToast(index >= 0 ? "Habit reopened" : "Habit complete");
 }
 
 function addListItem(text, category, addedBy) {
@@ -1971,7 +1971,7 @@ function renderLearning() {
   const completed = Math.min(goal, daily.reviewedIds.length);
   $("#learningCourseTitle").textContent = pack.flag + " " + pack.name + " · " + pack.nativeName;
   $("#learningForLabel").textContent = profileName(state.languageProfile) + "’s course";
-  const courseLabel = pack.cefrMax === "B1" ? "B1 preparation" : pack.cefrMax === "A2" ? "A1–A2 foundations" : "A1 introduction";
+  const courseLabel = pack.cefrMax === "B1" ? "B1 preparation" : pack.cefrMax === "A2" ? "A1 to A2 foundations" : "A1 introduction";
   $("#learningCatalogMeta").textContent = stats.total + " offline cards · " + (pack.levels || ["A1"]).join(" → ") + " · " + courseLabel;
   $("#learningRetainedCount").textContent = stats.retained;
   $("#learningMasteredCount").textContent = stats.mastered;
@@ -2105,7 +2105,7 @@ function renderLanguageSession() {
   $("#languageChoices").hidden = session.phase !== "question" && session.phase !== "answered";
   if (complete) {
     $("#languageSessionEyebrow").textContent = "Practice complete";
-    $("#languageSessionTitle").textContent = "Nice steady work";
+    $("#languageSessionTitle").textContent = "Practice complete";
     $("#languageQuestionLabel").textContent = "Long-term learning";
     $("#languageQuestion").textContent = session.correct + " of " + session.answered + " answered correctly";
     $("#languageChoices").innerHTML = "";
@@ -2120,7 +2120,7 @@ function renderLanguageSession() {
   $("#languageAnswer").textContent = card.answer;
   $("#languagePronunciation").textContent = card.pronunciation || "";
   $("#languageNote").textContent = card.note || "";
-  $("#languageFeedback").textContent = session.phase === "answered" ? session.selected === session.question.correct ? "Correct — this card has been scheduled for a later day." : "Not this time. The correct answer is shown above, and the card will return." : session.phase === "teach" ? "Read and listen first. Then practice recalling it without the answer visible." : "Choose once. Only the first attempt today affects retention progress.";
+  $("#languageFeedback").textContent = session.phase === "answered" ? session.selected === session.question.correct ? "Correct. This card has been scheduled for a later day." : "Incorrect. The correct answer is shown above, and the card will return." : session.phase === "teach" ? "Read and listen first. Then practice recalling it without the answer visible." : "Choose once. Only the first attempt today affects retention progress.";
   $("#languageFeedback").className = "language-feedback " + (session.phase === "answered" ? session.selected === session.question.correct ? "correct" : "incorrect" : "");
   $("#languageChoices").innerHTML = session.question.options.map((option) => '<button class="' + (session.phase === "answered" && option === session.question.correct ? "correct" : session.phase === "answered" && option === session.selected ? "incorrect" : "") + '" data-language-choice="' + escapeHtml(option) + '" type="button" ' + (session.phase === "answered" ? "disabled" : "") + '>' + escapeHtml(option) + "</button>").join("");
 }
@@ -2417,10 +2417,10 @@ async function completePhotoStep(withPhoto) {
     record.returnedAt = null;
     record.reviewMarkup = false;
     await deleteEvidence(id + ":feedback");
-    showToast("Submitted for adult approval — points are pending");
+    showToast("Submitted for adult approval. Points are pending.");
   } else {
     record.status = "in-progress";
-    showToast("Before photo saved — you’ve got this!");
+    showToast("Before photo saved. Add an after photo when the chore is finished.");
   }
   state.chores[id] = record;
   persistChores();
@@ -2960,7 +2960,7 @@ function renderRewardClaim() {
     $("#confirmClaimButton").textContent = "Buy for " + item.cost + " points";
   } else {
     $("#claimEyebrow").textContent = "Reward claimed";
-    $("#claimTitle").textContent = "Nice work!";
+    $("#claimTitle").textContent = "Reward purchased";
     $("#claimBody").innerHTML = '<div class="claim-hero success"><span>🎉</span><strong>' + escapeHtml(item.name) + "</strong><p>The household adults will see this claim. You can also put it on the family calendar now.</p></div>";
   }
 }
@@ -3179,7 +3179,7 @@ function timerTick() {
   renderTimer();
   if (state.timerSeconds > 0) return;
   stopTimer();
-  showToast("Family timer finished — check the timer tile!");
+  showToast("Family timer finished. Check the timer tile.");
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
@@ -3439,7 +3439,7 @@ $("#reactionPad").addEventListener("click", () => {
     clearTimeout(game.timeoutId);
     game.status = "idle";
     renderReactionGame();
-    showToast("Too soon — wait for green!");
+    showToast("Too soon. Wait for green.");
     return;
   }
   if (game.status === "ready") {
@@ -4346,7 +4346,7 @@ document.addEventListener("click", (event) => {
     navigateTo(nav.dataset.view);
   }
 });
-$$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#languageSettingsTile):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is ready for the next detail pass")));
+$$(".settings-tile:not(#settingsLayoutButton):not(#familyMembersButton):not(#profileThemesButton):not(#sleepWakeButton):not(#vacationModeButton):not(#activityButton):not(#googleCalendarButton):not(#languageSettingsTile):not(#connectedDevicesButton):not(#backupButton)").forEach((button) => button.addEventListener("click", () => showToast("This settings panel is not available yet")));
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js?v=" + encodeURIComponent(APP_VERSION), { updateViaCache: "none" }).catch(() => {}));
 

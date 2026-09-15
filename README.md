@@ -115,7 +115,7 @@ Important LAN behavior:
 
 ## Offline language learning
 
-The 1,652-card curriculum is bundled as static text in `dist/languages.js` and the `dist/language-*.js` course files. It adds only about 153 KB of source text, works without an account or network request, and never calls an AI service at runtime. The catalog currently contains:
+The 1,652-card curriculum is bundled as static text in `dist/languages.js` and the `dist/language-*.js` course files. It adds about 153 KB of source text and works without an account or network request. The catalog currently contains:
 
 - German: 504 cards across 45 modules, organized from A1 through B1 preparation
 - Korean: 488 cards across 44 modules, with Hangul-first foundations through B1 preparation
@@ -124,7 +124,7 @@ The 1,652-card curriculum is bundled as static text in `dist/languages.js` and t
 
 Level filters keep the larger paths approachable, while quizzes prefer plausible distractors from the same level and card type. The B1 label deliberately means **B1 preparation**, not a fluency certificate: card recall cannot by itself demonstrate spontaneous conversation, listening comprehension, pronunciation, or extended writing. Before presenting the curriculum as formal instruction, translations and cultural notes should receive a native or professionally fluent speaker review.
 
-Every household member has separate progress. The daily session prioritizes overdue reviews, then introduces new material. Learners can keep studying for as long as they like: the next module opens after they have meaningfully tried a few cards in the previous one, or retained any card there, rather than waiting for a large mastery percentage. A correct first attempt advances the card to a later review interval of 1, 3, 7, 14, 30, and 60 days. Repeating the same card on the same day can provide practice but cannot advance retention, increase daily progress, or inflate XP. “Retained” requires recall on at least two different days; “mastered” requires at least five correct days spanning 14 or more days and the later review stage. The family leaderboard ranks retained vocabulary first, followed by mastered vocabulary and XP.
+Every household member has separate progress. The daily session shows overdue reviews before new material. Learners can keep studying for as long as they like. The next module opens after they try three cards in the previous module or retain one card there. A correct first attempt advances the card to a later review interval of 1, 3, 7, 14, 30, and 60 days. Repeating the same card on the same day can provide practice but cannot advance retention, increase daily progress, or inflate XP. “Retained” requires recall on at least two different days. “Mastered” requires at least five correct days spanning 14 or more days and the later review stage. The family leaderboard ranks retained vocabulary first, followed by mastered vocabulary and XP.
 
 The weather widget uses Open-Meteo for city lookup and forecast data. A selected location and its latest successful forecast are stored with the household so the card remains useful when the internet is unavailable; live refreshes require an internet connection. On Android, choosing **Use this device's location** asks for location permission only at that moment and saves only rounded coordinates suitable for a neighborhood-level forecast.
 

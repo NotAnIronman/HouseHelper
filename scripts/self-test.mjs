@@ -42,6 +42,7 @@ assert.equal(compat.inferDeviceName({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhon
 
 const html = await readFile(join(root, "dist", "index.html"), "utf8");
 const app = await readFile(join(root, "dist", "app.js"), "utf8");
+const readme = await readFile(join(root, "README.md"), "utf8");
 const sync = await readFile(join(root, "dist", "sync.js"), "utf8");
 const worker = await readFile(join(root, "dist", "service-worker.js"), "utf8");
 const gradle = await readFile(join(root, "android-host", "app", "build.gradle"), "utf8");
@@ -64,6 +65,8 @@ assert.match(html, /id="evidenceViewerDialog"/);
 assert.match(html, /id="listIdentityDialog"/);
 assert.match(html, /id="weatherDialog"/);
 assert.match(html, /id="pairingQrCode"/);
+assert.doesNotMatch(html + app + readme, new RegExp("[\\u2014\\u2013\\u2011]"), "user-facing copy must not contain long dash characters");
+assert.doesNotMatch(html, /\bAI\b/, "the interface must use direct product language");
 for (const asset of ["qr", "languages", "language-german-b1", "language-korean-b1", "language-world", "language-more", "app", "sync"]) {
   assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be loaded by the dashboard");
   assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be available offline");
@@ -79,7 +82,7 @@ assert.match(app, /record\.lastReviewDate !== today/, "same-day repetition must 
 assert.match(app, /record\.correctDays\.length >= 5[\s\S]*daysBetween/, "mastery must require recall across at least five days and a multi-week span");
 assert.match(app, /sameKind[\s\S]*sameLevel[\s\S]*ranked/, "quiz distractors must prefer the same card type and course level");
 assert.match(app, /existingLanguageCardProgress/, "viewing the expanded catalog must not create empty progress records");
-assert.match(app, /retained >= 1 \|\| introduced >= Math\.min\(3/, "a learner must unlock the next module after meaningfully trying the previous one");
+assert.match(app, /retained >= 1 \|\| introduced >= Math\.min\(3/, "a learner must unlock the next module after trying three cards in the previous one");
 assert.match(app, /reviewReason/);
 assert.match(app, /chore\.id \+ ":feedback"/);
 assert.match(app, /data-list-identity/);
