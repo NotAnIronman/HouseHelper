@@ -2,6 +2,10 @@ package com.househelper.familydashboard;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
@@ -14,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
@@ -45,6 +50,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_SAVE_BACKUP = 7102;
     private static final int REQUEST_NOTIFICATIONS = 7103;
     private static final int REQUEST_LOCATION = 7104;
+    private static final String ALERT_CHANNEL_ID = "househelper-alerts";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WebView webView;
@@ -56,6 +62,8 @@ public final class MainActivity extends Activity {
     private boolean loaded;
     private GeolocationPermissions.Callback pendingGeolocationCallback;
     private String pendingGeolocationOrigin;
+    private TextToSpeech textToSpeech;
+    private volatile boolean textToSpeechReady;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +71,8 @@ public final class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         pruneCameraCache();
         configureWebView();
+        initializeTextToSpeech();
+        createAlertChannel();
         startHostService();
         requestNotificationPermission();
         waitForHost();
@@ -84,6 +94,12 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+            textToSpeechReady = false;
+        }
         deletePendingCameraImage();
         if (pendingGeolocationCallback != null) {
             pendingGeolocationCallback.invoke(pendingGeolocationOrigin, false, false);
@@ -158,6 +174,41 @@ public final class MainActivity extends Activity {
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
         }
+    }
+
+    private void initializeTextToSpeech() {
+        textToSpeech = new TextToSpeech(this, status -> textToSpeechReady = status == TextToSpeech.SUCCESS);
+    }
+
+    private void createAlertChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        NotificationChannel channel = new NotificationChannel(ALERT_CHANNEL_ID, "Household alerts", NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("Calendar, alarm, and important chore reminders");
+        channel.enableVibration(true);
+        manager.createNotificationChannel(channel);
+    }
+
+    private void showHouseholdNotification(String title, String body, String tag) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        Intent openIntent = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int requestCode = Math.abs((tag == null ? title : tag).hashCode());
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, requestCode, openIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, ALERT_CHANNEL_ID)
+                : new Notification.Builder(this);
+        builder.setSmallIcon(R.drawable.ic_househelper)
+                .setContentTitle(title == null || title.isEmpty() ? "HouseHelper" : title)
+                .setContentText(body == null ? "" : body)
+                .setStyle(new Notification.BigTextStyle().bigText(body == null ? "" : body))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .setPriority(Notification.PRIORITY_HIGH);
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager != null) manager.notify(tag == null ? null : tag, requestCode, builder.build());
     }
 
     private void waitForHost() {
@@ -479,6 +530,32 @@ public final class MainActivity extends Activity {
                             : filename,
                     mimeType
             ));
+        }
+
+        @JavascriptInterface
+        public boolean speakText(String text, String languageTag) {
+            if (!textToSpeechReady || textToSpeech == null || text == null || text.trim().isEmpty()) return false;
+            Locale locale = Locale.forLanguageTag(languageTag == null ? "" : languageTag);
+            int availability = textToSpeech.setLanguage(locale);
+            if (availability == TextToSpeech.LANG_MISSING_DATA || availability == TextToSpeech.LANG_NOT_SUPPORTED) return false;
+            textToSpeech.setSpeechRate(0.82f);
+            return textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "househelper-language") == TextToSpeech.SUCCESS;
+        }
+
+        @JavascriptInterface
+        public void notify(String title, String body, String tag) {
+            runOnUiThread(() -> showHouseholdNotification(title, body, tag));
+        }
+
+        @JavascriptInterface
+        public boolean notificationsEnabled() {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                    || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public void requestNotifications() {
+            runOnUiThread(MainActivity.this::requestNotificationPermission);
         }
     }
 }

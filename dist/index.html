@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.6.2" />
+    <link rel="stylesheet" href="./styles.css?v=0.7.0" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -93,6 +93,13 @@
             <div class="reward-shop-balance"><span class="reward-wallet">★</span><span><strong><span id="pointCount">80</span> points</strong><small>Saved points never expire</small></span></div>
             <div class="home-reward-shop" id="homeRewardChoices" aria-label="Reward shop choices"></div>
             <p class="reward-shop-note" id="encouragement">Points only change when a reward is purchased.</p>
+          </section>
+
+          <section class="card quick-points-card adult-only" data-widget="points" aria-labelledby="quickPointsTitle">
+            <div class="card-header compact"><div><p class="eyebrow">Adult shortcut</p><h2 id="quickPointsTitle">Quick points</h2></div><span class="quick-points-balance" id="quickPointsBalance">0</span></div>
+            <div class="reward-kid-tabs quick-point-tabs" id="quickPointTabs" aria-label="Choose a child point account"></div>
+            <p class="quick-points-name" id="quickPointsName">Choose a child, then record a quick adjustment.</p>
+            <div class="quick-point-buttons"><button data-quick-points="-5" type="button">−5</button><button data-quick-points="-1" type="button">−1</button><button data-quick-points="1" type="button">+1</button><button data-quick-points="5" type="button">+5</button></div>
           </section>
 
           <section class="card chores-card" id="chores" data-widget="chores" aria-labelledby="choresTitle">
@@ -177,9 +184,12 @@
         </section>
 
         <section class="app-view full-app-view" id="calendarView" data-app-view="calendar" hidden>
-          <header class="view-header"><div><p class="eyebrow">Shared schedule</p><h1>Family calendar</h1><p>Imported schedules and family-added plans live together here.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="connectCalendarButton" type="button">Connect Google Calendar</button><button class="primary-button" id="addEventButton" type="button">+ Add event</button></div></header>
-          <div class="week-strip" id="weekStrip"></div>
+          <header class="view-header"><div><p class="eyebrow">Shared schedule</p><h1>Family calendar</h1><p>Imported schedules, family plans, and repeating alarms live together here.</p></div><div class="view-header-actions"><button class="secondary-dark-button" id="connectCalendarButton" type="button">Connect Google Calendar</button><button class="secondary-dark-button" id="addAlarmButton" type="button">+ Add alarm</button><button class="primary-button" id="addEventButton" type="button">+ Add event</button></div></header>
+          <div class="calendar-toolbar"><div class="calendar-view-switcher" id="calendarViewSwitcher"><button data-calendar-mode="day" type="button">Day</button><button class="active" data-calendar-mode="week" type="button">Week</button><button data-calendar-mode="month" type="button">Month</button></div><div class="calendar-navigation"><button data-calendar-move="-1" type="button" aria-label="Previous period">‹</button><button id="calendarTodayButton" type="button">Today</button><button data-calendar-move="1" type="button" aria-label="Next period">›</button></div></div>
+          <div class="calendar-period-label" id="calendarPeriodLabel"></div>
+          <div class="calendar-date-grid week-strip" id="weekStrip"></div>
           <div class="calendar-agenda" id="calendarAgenda"></div>
+          <section class="alarm-panel"><div class="section-heading"><div><p class="eyebrow">Household alarms</p><h2>Repeating alarms</h2></div></div><div class="alarm-list" id="alarmList"></div></section>
         </section>
 
         <section class="app-view full-app-view" id="habitsView" data-app-view="habits" hidden>
@@ -248,6 +258,7 @@
             <button class="settings-tile" id="vacationModeButton" type="button"><span class="settings-icon">☀</span><span><strong>Vacation mode</strong><small id="vacationModeLabel">Repeating chores are running normally</small></span><b>›</b></button>
             <button class="settings-tile" id="activityButton" type="button"><span class="settings-icon"><svg><use href="#icon-list"></use></svg></span><span><strong>Household activity</strong><small>Approvals, rewards, schedules, and changes</small></span><b>›</b></button>
             <button class="settings-tile" id="googleCalendarButton" type="button"><span class="settings-icon"><svg><use href="#icon-calendar"></use></svg></span><span><strong>Google Calendar</strong><small id="googleCalendarLabel">Connect shared family schedules</small></span><b>›</b></button>
+            <button class="settings-tile" id="householdAlertsButton" type="button"><span class="settings-icon">!</span><span><strong>Household alerts</strong><small id="householdAlertsLabel">Events, alarms, and important unfinished chores</small></span><b>›</b></button>
             <button class="settings-tile" id="languageSettingsTile" type="button"><span class="settings-icon">文</span><span><strong>Language learning</strong><small id="languageSettingsLabel">Daily goal and reward bonus</small></span><b>›</b></button>
             <button class="settings-tile" id="connectedDevicesButton" type="button"><span class="settings-icon">⌁</span><span><strong>Connected devices</strong><small id="connectedDevicesLabel">Standalone on this device</small></span><b>›</b></button>
             <button class="settings-tile" id="backupButton" type="button"><span class="settings-icon">⇩</span><span><strong>Local data & backup</strong><small id="storageTileLabel">Saved privately in this browser</small></span><b>›</b></button>
@@ -274,6 +285,7 @@
         <span class="calm-visual" id="calmVisual" aria-hidden="true"></span>
         <span class="calm-shade" aria-hidden="true"></span>
         <span class="calm-content"><span class="calm-date" id="calmDate"></span><strong class="calm-time" id="calmTime"></strong><span class="calm-message" id="calmMessage">The house is resting</span></span>
+        <span class="calm-task-warning" id="calmTaskWarning" hidden></span>
         <span class="wake-hint">Tap anywhere to wake</span>
       </button>
     </div>
@@ -312,7 +324,7 @@
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
           <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.2</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.7.0</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -339,12 +351,14 @@
         <div class="dialog-header"><div><p class="eyebrow">Adult chore builder</p><h2 id="choreFormTitle">Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>What needs doing?</span><input id="choreTitleInput" maxlength="60" placeholder="Clean the bathroom mirror" required /></label>
-          <label class="field"><span>Assign to</span><select id="choreAssigneeInput" required></select></label>
+          <fieldset class="field field-wide assignee-field"><legend>Responsible people</legend><label class="assignee-everyone"><input id="choreEveryoneInput" type="checkbox" /><span><strong>Everyone</strong><small>All current household members share this chore</small></span></label><div class="assignee-picker" id="choreAssigneeInput"></div></fieldset>
           <label class="field"><span>Room or category</span><input id="choreAreaInput" maxlength="35" placeholder="Bathroom" required /></label>
           <label class="field"><span>Points</span><input id="chorePointsInput" type="number" min="0" max="500" value="10" inputmode="numeric" required /></label>
+          <label class="field"><span>Importance</span><select id="choreImportanceInput"><option value="1">★ Optional</option><option value="2">★★ Low</option><option value="3" selected>★★★ Normal</option><option value="4">★★★★ Important</option><option value="5">★★★★★ Critical</option></select></label>
           <label class="field"><span>Due date</span><input id="choreDueDateInput" type="date" required /></label>
           <label class="field"><span>Due time</span><input id="choreDueTimeInput" type="time" value="18:00" required /></label>
-          <label class="field field-wide"><span>Repeats</span><select id="choreRepeatInput"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week on this day</option></select></label>
+          <label class="field field-wide"><span>Repeats</span><select id="choreRepeatInput"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="alternate">Every other day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week on this day</option><option value="custom">Specific days of the week</option></select></label>
+          <fieldset class="weekday-picker field-wide" id="choreWeekdayField" hidden><legend>Repeat on</legend><label><input type="checkbox" value="1" /><span>Mon</span></label><label><input type="checkbox" value="2" /><span>Tue</span></label><label><input type="checkbox" value="3" /><span>Wed</span></label><label><input type="checkbox" value="4" /><span>Thu</span></label><label><input type="checkbox" value="5" /><span>Fri</span></label><label><input type="checkbox" value="6" /><span>Sat</span></label><label><input type="checkbox" value="0" /><span>Sun</span></label></fieldset>
           <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until an adult reviews the evidence.</small></span></label>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveChoreButton" value="save" type="submit">Add chore</button></div>
@@ -506,6 +520,33 @@
       </form>
     </dialog>
 
+    <dialog id="alarmDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="alarmForm">
+        <div class="dialog-header"><div><p class="eyebrow">Household alarm</p><h2 id="alarmFormTitle">Add an alarm</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid">
+          <label class="field field-wide"><span>Alarm name</span><input id="alarmNameInput" maxlength="70" placeholder="Time to brush teeth" required /></label>
+          <label class="field"><span>Who should see it?</span><select id="alarmPeopleInput" required></select></label>
+          <label class="field"><span>Time</span><input id="alarmTimeInput" type="time" value="19:00" required /></label>
+          <fieldset class="weekday-picker field-wide" id="alarmWeekdayField"><legend>Repeat on</legend><label><input type="checkbox" value="1" checked /><span>Mon</span></label><label><input type="checkbox" value="2" checked /><span>Tue</span></label><label><input type="checkbox" value="3" checked /><span>Wed</span></label><label><input type="checkbox" value="4" checked /><span>Thu</span></label><label><input type="checkbox" value="5" checked /><span>Fri</span></label><label><input type="checkbox" value="6" checked /><span>Sat</span></label><label><input type="checkbox" value="0" checked /><span>Sun</span></label></fieldset>
+          <label class="check-field field-wide"><input id="alarmEnabledInput" type="checkbox" checked /><span><strong>Alarm is enabled</strong><small>Every connected device with HouseHelper open can alert at this time.</small></span></label>
+        </div>
+        <div class="dialog-footer split-footer"><button class="danger-button" id="deleteAlarmButton" type="button" hidden>Delete alarm</button><span></span><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save alarm</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="householdAlertsDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="householdAlertsForm">
+        <div class="dialog-header"><div><p class="eyebrow">Every connected screen</p><h2>Household alerts</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body">
+          <label class="check-field"><input id="householdAlertsEnabledInput" type="checkbox" checked /><span><strong>Alert this device</strong><small>Calendar reminders, alarms, and important incomplete chores can appear here.</small></span></label>
+          <div class="form-grid"><label class="field"><span>Chore importance threshold</span><select id="choreAlertImportanceInput"><option value="1">★ and higher</option><option value="2">★★ and higher</option><option value="3">★★★ and higher</option><option value="4" selected>★★★★ and higher</option><option value="5">★★★★★ only</option></select></label><label class="field"><span>Warn before chore due time</span><select id="choreAlertLeadInput"><option value="0">At due time</option><option value="5">5 minutes before</option><option value="15" selected>15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option></select></label></div>
+          <p class="integration-help">Connected phones and browsers alert independently so one screen does not silence another. Keep the HouseHelper app or web page open for local Wi-Fi alerts.</p>
+          <button class="secondary-dark-button" id="enableHouseholdNotificationsButton" type="button">Enable device notifications</button>
+        </div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save alerts</button></div>
+      </form>
+    </dialog>
+
     <dialog id="habitDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="habitForm">
         <div class="dialog-header"><div><p class="eyebrow">Build a routine</p><h2 id="habitFormTitle">Add a family habit</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
@@ -543,7 +584,7 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.2</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.7.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
           <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi-Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app runs the household service.</p>
@@ -553,7 +594,7 @@
     </dialog>
 
     <dialog id="eventReminderDialog" class="app-dialog reminder-dialog">
-      <div class="dialog-panel"><div class="reminder-hero"><span>🔔</span><p class="eyebrow">Coming up soon</p><h2 id="reminderTitle">Family event</h2><p id="reminderDetails">Starts in 15 minutes</p></div><div class="dialog-footer"><button class="secondary-button" id="dismissReminderButton" type="button">Dismiss</button><button class="secondary-dark-button" id="snoozeReminderButton" type="button">Snooze 5 min</button><button class="primary-button" id="openReminderEventButton" type="button">Open calendar</button></div></div>
+      <div class="dialog-panel"><div class="reminder-hero"><span>🔔</span><p class="eyebrow">Household alert</p><h2 id="reminderTitle">Family event</h2><p id="reminderDetails">Starts in 15 minutes</p></div><div class="dialog-footer"><button class="secondary-button" id="dismissReminderButton" type="button">Dismiss</button><button class="secondary-dark-button" id="snoozeReminderButton" type="button">Snooze 5 min</button><button class="primary-button" id="openReminderEventButton" type="button">Open calendar</button></div></div>
     </dialog>
 
     <dialog id="artViewerDialog" class="art-viewer-dialog">
@@ -622,14 +663,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.6.2" defer></script>
-    <script src="./qr.js?v=0.6.2" defer></script>
-    <script src="./languages.js?v=0.6.2" defer></script>
-    <script src="./language-german-b1.js?v=0.6.2" defer></script>
-    <script src="./language-korean-b1.js?v=0.6.2" defer></script>
-    <script src="./language-world.js?v=0.6.2" defer></script>
-    <script src="./language-more.js?v=0.6.2" defer></script>
-    <script src="./app.js?v=0.6.2" defer></script>
-    <script src="./sync.js?v=0.6.2" defer></script>
+    <script src="./compat.js?v=0.7.0" defer></script>
+    <script src="./qr.js?v=0.7.0" defer></script>
+    <script src="./languages.js?v=0.7.0" defer></script>
+    <script src="./language-german-b1.js?v=0.7.0" defer></script>
+    <script src="./language-korean-b1.js?v=0.7.0" defer></script>
+    <script src="./language-world.js?v=0.7.0" defer></script>
+    <script src="./language-more.js?v=0.7.0" defer></script>
+    <script src="./app.js?v=0.7.0" defer></script>
+    <script src="./sync.js?v=0.7.0" defer></script>
   </body>
 </html>

@@ -16,7 +16,7 @@ await import(new URL("../dist/language-more.js", import.meta.url));
 const compat = globalThis.HouseHelperCompat;
 const languagePacks = globalThis.HouseHelperLanguagePacks.packs;
 
-assert.equal(compat.VERSION, "0.6.2");
+assert.equal(compat.VERSION, "0.7.0");
 assert.ok(languagePacks.every((pack) => pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "every course must ship with a B1-preparation path");
 assert.deepEqual(languagePacks.map((pack) => pack.id), ["german", "korean", "spanish", "french", "japanese", "italian", "mandarin"], "the complete offline course catalog must load in a stable order");
 const languageCards = languagePacks.flatMap((pack) => pack.modules.flatMap((module) => module.cards));
@@ -68,12 +68,12 @@ assert.match(html, /id="weatherDialog"/);
 assert.match(html, /id="pairingQrCode"/);
 assert.match(html, /id="chorePhoto"[^>]*multiple/);
 assert.doesNotMatch(html, /id="chorePhoto"[^>]*capture=/, "chore photos must offer both the camera and the file picker");
-for (const id of ["choreFormTitle", "saveChoreButton", "habitFormTitle", "saveHabitButton", "listEditDialog", "artEditDialog", "editBeforeEvidenceButton", "editAfterEvidenceButton"]) assert.match(html, new RegExp('id="' + id + '"'));
+for (const id of ["choreFormTitle", "saveChoreButton", "habitFormTitle", "saveHabitButton", "listEditDialog", "artEditDialog", "editBeforeEvidenceButton", "editAfterEvidenceButton", "alarmDialog", "householdAlertsDialog", "calendarViewSwitcher", "quickPointTabs", "calmTaskWarning"]) assert.match(html, new RegExp('id="' + id + '"'));
 assert.doesNotMatch(html + app + readme, new RegExp("[\\u2014\\u2013\\u2011]"), "user-facing copy must not contain long dash characters");
 assert.doesNotMatch(html, /\bAI\b/, "the interface must use direct product language");
 for (const asset of ["qr", "languages", "language-german-b1", "language-korean-b1", "language-world", "language-more", "app", "sync"]) {
-  assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.6\\.2"), asset + " must be loaded by the dashboard");
-  assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.6\\.2"), asset + " must be available offline");
+  assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.7\\.0"), asset + " must be loaded by the dashboard");
+  assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.7\\.0"), asset + " must be available offline");
 }
 assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/, "service worker must never cache household API responses");
 assert.match(app, /updateViaCache:\s*"none"/, "service worker updates must bypass stale HTTP caches");
@@ -105,9 +105,17 @@ assert.match(app, /api\.open-meteo\.com\/v1\/forecast/);
 assert.match(app, /geocoding-api\.open-meteo\.com\/v1\/search/);
 assert.match(app, /beginWidgetHold/);
 assert.match(app, /HouseHelperQR\.toCanvas/);
-assert.match(gradle, /versionName = "0\.6\.2"/);
+assert.match(app, /assignmentMode === "everyone"/);
+assert.match(app, /chore\.repeat === "alternate"/);
+assert.match(app, /chore\.repeat === "custom"/);
+assert.match(app, /canAdultApproveChore/);
+assert.match(app, /data-quick-points/);
+assert.match(app, /calendarMode/);
+assert.match(app, /refundClaim/);
+assert.match(app, /hs-device-alerts/, "alerts must be tracked independently on every connected device");
+assert.match(gradle, /versionName = "0\.7\.0"/);
 assert.match(gradle, /androidx\.core:core/, "Android FileProvider support must be packaged");
-assert.match(server, /APP_VERSION = "0\.6\.2"/);
+assert.match(server, /APP_VERSION = "0\.7\.0"/);
 assert.match(manifest, /android\.permission\.ACCESS_COARSE_LOCATION/);
 assert.match(manifest, /androidx\.core\.content\.FileProvider/);
 assert.match(filePaths, /cache-path name="camera" path="camera\/"/);
@@ -116,6 +124,9 @@ assert.match(mainActivity, /setGeolocationEnabled\(true\)/);
 assert.match(mainActivity, /MODE_OPEN_MULTIPLE/);
 assert.match(mainActivity, /getClipData\(\)/, "Android multi-file results must retain every selected URI");
 assert.match(mainActivity, /pendingCameraFile\.length\(\) > 0/, "empty camera results must never be returned to the WebView");
+assert.match(mainActivity, /TextToSpeech/, "Android must provide a native language speech fallback");
+assert.match(mainActivity, /public boolean speakText/, "the native speech bridge must be callable from the dashboard");
+assert.match(mainActivity, /public void notify/, "the native notification bridge must alert the host tablet");
 assert.match(app, /const DEFAULT_CHORES = \[\];/);
 assert.match(app, /const DEFAULT_ARTWORKS = \[\];/);
 assert.match(app, /const DEFAULT_EVENTS = \[\];/);
@@ -168,7 +179,7 @@ const context = {
     const payload = options.method === "POST"
       ? { revision: 1, clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" }
       : { revision: 1, entries: [], clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" };
-    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.6.2" : null }, json: async () => payload };
+    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.7.0" : null }, json: async () => payload };
   },
   localStorage: storage,
   location: { hostname: "192.168.1.2", origin: "http://192.168.1.2:4173", pathname: "/", search: "?pair=test-token", reload() {}, assign() {} },
