@@ -11,12 +11,12 @@ A touch-first family dashboard for chores, routines, rewards, schedules, languag
 - Full-screen Chores, Habits, Lists, Rewards, Calendar, Languages, Art, Games, and Settings views
 - Per-profile widget ordering, sizing, and visibility controls, including live long-hold drag-and-drop on Home
 - A save-and-spend reward shop with persistent point balances, multiple choices, double-confirmation purchases, adult notices, and reward scheduling
-- Before/after chore evidence with up to six photos per stage, camera or file upload, available photo timestamps, tap-to-enlarge backchecking, written return reasons, and thin photo markup for circling missed areas
+- Before/after chore evidence with up to six photos per stage, camera or file upload, available photo timestamps, tap-to-enlarge backchecking, in-place photo editing, written return reasons, and thin photo markup for circling missed areas
 - Adult passcodes, approval attribution, and points awarded only after approval
 - Adult-created chores assignable to any family member
 - Daily, weekday, and weekly repeating chores with adult-controlled removal
-- Habit and routine tracking with daily streaks and per-person views
-- A shared grocery/household/school/ideas list with request attribution plus a pinned family note
+- Habit and routine tracking with daily streaks, per-person views, and edits that preserve streak history
+- A shared grocery/household/school/ideas list with request attribution, in-place editing, and a pinned family note
 - Overdue and repeatedly missed chore warnings
 - Dashboard-created family calendar events for adults and children, including edit and adult-gated delete controls
 - Full-screen artwork viewing and a touch-first finger-painting canvas
@@ -60,15 +60,15 @@ The first Gradle sync downloads build tooling and therefore needs internet acces
 
 After the APK opens, go to **Settings → Connected devices**. Other family devices on the same non-guest Wi-Fi can open the displayed pairing address in Safari or Chrome; they do not install the host APK. Keep the pairing address private because it contains the household access token. The Android host's data is app-private, and **Settings → Local data & backup** creates a portable backup including photos.
 
-For dependable overnight hosting, open Android **Settings → Apps → HouseHelper → Battery** and choose **Unrestricted**. Keep Wi-Fi enabled and leave the persistent hosting notification allowed. HouseHelper 0.6.1 also holds a high-performance Wi-Fi lock while its foreground host service is running, which makes reconnecting after the screen sleeps substantially more reliable.
+For dependable overnight hosting, open Android **Settings → Apps → HouseHelper → Battery** and choose **Unrestricted**. Keep Wi-Fi enabled and leave the persistent hosting notification allowed. HouseHelper 0.6.2 also holds a high-performance Wi-Fi lock while its foreground host service is running, which makes reconnecting after the screen sleeps substantially more reliable.
 
 ### Updating the tablet after a new commit
 
 1. In Android Studio's **Terminal**, run `git pull` from the repository root.
 2. Wait for Gradle sync if Android Studio starts one. Confirm the run configuration still says `app` and the tablet is selected.
 3. Press **Run**. Android Studio rebuilds the bundled dashboard and installs it over the current debug app; household app data remains in place.
-4. In HouseHelper, open **Settings → Connected devices** and check **App build**. This release shows `0.6.1-debug` on the tablet and `0.6.1` in phone browsers.
-5. On each secondary device, close the old HouseHelper tab and scan the QR code or reopen the pairing address shown by the tablet. The connection details should say **Secondary**, and the phone's build and host build should both be 0.6.1.
+4. In HouseHelper, open **Settings → Connected devices** and check **App build**. This release shows `0.6.2-debug` on the tablet and `0.6.2` in phone browsers.
+5. On each secondary device, close the old HouseHelper tab and scan the QR code or reopen the pairing address shown by the tablet. The connection details should say **Secondary**, and the phone's build and host build should both be 0.6.2.
 
 If the screen still looks unchanged after step 3, uninstalling is not the first choice because it removes the debug app's private household data. First run the app again from Android Studio and use the build label above to verify which APK is actually installed. Make a complete backup before any uninstall or switch between debug and release builds.
 

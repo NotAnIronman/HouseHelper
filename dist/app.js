@@ -3,7 +3,7 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
-const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.6.1";
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.6.2";
 
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -226,12 +226,14 @@ const state = {
   view: VIEWS.includes(initialView) ? initialView : "home",
   rewardOwner: firstChildId(),
   rewardDraftPoints: 0,
+  editingRewardId: null,
   rewards: Object.fromEntries(childIds().map((id) => [id, normalizeRewardAccount(id, storedRewards[id])])),
   rewardClaims: readStoredArray("hh-reward-claims", []),
   activeClaim: null,
   schedulingClaimId: null,
   chores: readStoredObject("hh-chores"),
   customChores: readStoredArray("hh-custom-chores", []),
+  editingChoreId: null,
   removedChoreIds: readStoredArray("hh-removed-chores", []),
   layouts: readStoredObject("hh-layouts"),
   layoutDraft: [],
@@ -247,8 +249,10 @@ const state = {
   habits: readStoredArray("hh-habits", clone(DEFAULT_HABITS)),
   habitCompletions: readStoredObject("hh-habit-completions"),
   habitFilter: "all",
+  editingHabitId: null,
   listItems: readStoredArray("hh-shared-list", clone(DEFAULT_LIST_ITEMS)),
   listFilter: "all",
+  editingListId: null,
   pendingListItem: null,
   familyNote: localStorage.getItem("hh-family-note") || "",
   activity: readStoredArray("hh-activity", []),
@@ -266,6 +270,7 @@ const state = {
   artworks: readStoredArray("hh-artworks", clone(DEFAULT_ARTWORKS)),
   showArchivedArt: false,
   activeArtId: null,
+  artReplacementData: null,
   pendingDelete: null,
   timerSeconds: initialTimerRemaining,
   timerInitial: Math.max(60, Number(initialTimerSettings.initialSeconds) || 15 * 60),
@@ -275,6 +280,8 @@ const state = {
   activeChore: null,
   detailChoreId: null,
   detailUrls: [],
+  editingEvidence: null,
+  returnToChoreDetailId: null,
   reviewParentId: null,
   reviewColor: "#ef3f37",
   reviewDrawing: false,
@@ -337,6 +344,8 @@ const elements = {
   googleCalendarDialog: $("#googleCalendarDialog"),
   eventReminderDialog: $("#eventReminderDialog"),
   habitDialog: $("#habitDialog"),
+  listEditDialog: $("#listEditDialog"),
+  artEditDialog: $("#artEditDialog"),
   activityDialog: $("#activityDialog"),
   backupDialog: $("#backupDialog"),
   connectedDevicesDialog: $("#connectedDevicesDialog"),
@@ -606,8 +615,9 @@ function choreMarkup(chore, showPerson, fullBoard) {
   } else {
     action = '<span class="status-stack"><span class="status-badge approved">' + (record.approvedBy ? "Approved" : "Completed") + "</span>" + (record.approvedBy ? '<span class="approval-by">by ' + escapeHtml(record.approvedBy) + "</span>" : "") + "</span>";
   }
+  const editButton = fullBoard && canReviewFromCurrentView() ? '<button class="chore-edit" data-edit-chore="' + chore.id + '" type="button" aria-label="Edit ' + escapeHtml(chore.title) + '">✎</button>' : "";
   const removeButton = fullBoard && canReviewFromCurrentView() ? '<button class="chore-delete" data-delete-chore="' + chore.id + '" type="button" aria-label="Remove ' + escapeHtml(chore.title) + '">×</button>' : "";
-  const controls = removeButton ? '<span class="chore-action-group">' + action + removeButton + "</span>" : action;
+  const controls = editButton || removeButton ? '<span class="chore-action-group">' + action + editButton + removeButton + "</span>" : action;
   return '<article class="chore-item' + (isDone ? " done" : "") + '" data-chore-id="' + chore.id + '" data-person="' + chore.person + '" data-state="' + status + '" data-points="' + chore.points + '" tabindex="' + (status === "pending" || status === "done" ? "0" : "-1") + '">' +
     (isDone ? '<span class="chore-check"><svg><use href="#icon-check"></use></svg></span>' : '<span class="chore-icon">' + chore.icon + "</span>") +
     '<div class="chore-copy"><strong>' + escapeHtml(chore.title) + "</strong><span>" + escapeHtml(meta) + "</span>" + (warning ? '<span class="warning-inline">' + escapeHtml(warning) + "</span>" : "") + "</div>" + controls + "</article>";
@@ -1000,7 +1010,9 @@ function habitMarkup(habit, fullBoard) {
   const done = habitDoneToday(habit);
   const streak = habitStreak(habit);
   const canDelete = fullBoard && (PROFILES[state.profile].adult || state.profile === "family");
-  return '<article class="habit-row' + (done ? " done" : "") + '" data-habit-id="' + habit.id + '"><button class="habit-check" data-toggle-habit="' + habit.id + '" type="button" aria-label="' + (done ? "Undo " : "Complete ") + escapeHtml(habit.name) + '">' + (done ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="habit-icon">' + escapeHtml(habit.icon) + '</span><span class="habit-copy"><strong>' + escapeHtml(habit.name) + '</strong><small>' + escapeHtml(profileName(habit.person) + " · " + (habit.schedule === "daily" ? "Every day" : habit.schedule === "weekdays" ? "Weekdays" : "Weekends") + (habit.time ? " · " + formatTime(habit.time) : "")) + '</small></span><span class="habit-streak"><b>' + streak + '</b><small>day streak</small></span>' + (canDelete ? '<button class="row-delete" data-delete-habit="' + habit.id + '" type="button" aria-label="Delete ' + escapeHtml(habit.name) + '">×</button>' : "") + '</article>';
+  const canEdit = fullBoard && (canDelete || state.profile === habit.person);
+  const actions = canEdit || canDelete ? '<span class="row-actions">' + (canEdit ? '<button class="row-edit" data-edit-habit="' + habit.id + '" type="button" aria-label="Edit ' + escapeHtml(habit.name) + '">✎</button>' : "") + (canDelete ? '<button class="row-delete" data-delete-habit="' + habit.id + '" type="button" aria-label="Delete ' + escapeHtml(habit.name) + '">×</button>' : "") + '</span>' : "";
+  return '<article class="habit-row' + (done ? " done" : "") + '" data-habit-id="' + habit.id + '"><button class="habit-check" data-toggle-habit="' + habit.id + '" type="button" aria-label="' + (done ? "Undo " : "Complete ") + escapeHtml(habit.name) + '">' + (done ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="habit-icon">' + escapeHtml(habit.icon) + '</span><span class="habit-copy"><strong>' + escapeHtml(habit.name) + '</strong><small>' + escapeHtml(profileName(habit.person) + " · " + (habit.schedule === "daily" ? "Every day" : habit.schedule === "weekdays" ? "Weekdays" : "Weekends") + (habit.time ? " · " + formatTime(habit.time) : "")) + '</small></span><span class="habit-streak"><b>' + streak + '</b><small>day streak</small></span>' + actions + '</article>';
 }
 
 function renderHabits() {
@@ -1023,7 +1035,9 @@ function listCategoryLabel(category) {
 }
 
 function listItemMarkup(item, compact) {
-  return '<article class="shared-list-row' + (item.completed ? " done" : "") + '" data-list-id="' + item.id + '"><button class="list-check" data-toggle-list="' + item.id + '" type="button" aria-label="' + (item.completed ? "Mark active " : "Complete ") + escapeHtml(item.text) + '">' + (item.completed ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="list-copy"><strong>' + escapeHtml(item.text) + '</strong><small>' + escapeHtml(listCategoryLabel(item.category) + " · added by " + (PROFILES[item.addedBy] ? PROFILES[item.addedBy].name : "Family")) + '</small></span>' + (!compact && (PROFILES[state.profile].adult || state.profile === "family") ? '<button class="row-delete" data-delete-list="' + item.id + '" type="button" aria-label="Delete ' + escapeHtml(item.text) + '">×</button>' : "") + '</article>';
+  const canDelete = !compact && (PROFILES[state.profile].adult || state.profile === "family");
+  const actions = compact ? "" : '<span class="row-actions"><button class="row-edit" data-edit-list="' + item.id + '" type="button" aria-label="Edit ' + escapeHtml(item.text) + '">✎</button>' + (canDelete ? '<button class="row-delete" data-delete-list="' + item.id + '" type="button" aria-label="Delete ' + escapeHtml(item.text) + '">×</button>' : "") + '</span>';
+  return '<article class="shared-list-row' + (item.completed ? " done" : "") + '" data-list-id="' + item.id + '"><button class="list-check" data-toggle-list="' + item.id + '" type="button" aria-label="' + (item.completed ? "Mark active " : "Complete ") + escapeHtml(item.text) + '">' + (item.completed ? '<svg><use href="#icon-check"></use></svg>' : "") + '</button><span class="list-copy"><strong>' + escapeHtml(item.text) + '</strong><small>' + escapeHtml(listCategoryLabel(item.category) + " · added by " + (PROFILES[item.addedBy] ? PROFILES[item.addedBy].name : "Family")) + '</small></span>' + actions + '</article>';
 }
 
 function filteredListItems() {
@@ -1393,6 +1407,16 @@ function toggleListItem(listId) {
   persistListItems();
   logActivity((item.completed ? "Completed " : "Reopened ") + "list item “" + item.text + "”", item.completed ? "✓" : "↻");
   renderLists();
+}
+
+function openListEditDialog(listId) {
+  const item = state.listItems.find((entry) => entry.id === listId);
+  if (!item) return;
+  state.editingListId = item.id;
+  $("#listEditTextInput").value = item.text;
+  $("#listEditCategoryInput").value = item.category || "groceries";
+  elements.listEditDialog.showModal();
+  setTimeout(() => $("#listEditTextInput").focus(), 0);
 }
 
 function renderVacationDialogStatus() {
@@ -2341,12 +2365,17 @@ function openEvidenceDb() {
 
 async function saveEvidenceLocal(key, file) {
   const db = await openEvidenceDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("photos", "readwrite");
-    tx.objectStore("photos").put(file, key);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("photos", "readwrite");
+      tx.objectStore("photos").put(file, key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Photo storage was interrupted"));
+    });
+  } finally {
+    db.close();
+  }
 }
 
 async function saveEvidence(key, file) {
@@ -2356,12 +2385,18 @@ async function saveEvidence(key, file) {
 
 async function getEvidence(key) {
   const db = await openEvidenceDb();
-  const local = await new Promise((resolve, reject) => {
-    const tx = db.transaction("photos", "readonly");
-    const request = tx.objectStore("photos").get(key);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
+  let local;
+  try {
+    local = await new Promise((resolve, reject) => {
+      const tx = db.transaction("photos", "readonly");
+      const request = tx.objectStore("photos").get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+      tx.onabort = () => reject(tx.error || new Error("Photo lookup was interrupted"));
+    });
+  } finally {
+    db.close();
+  }
   if (local || !window.HouseHelperSync) return local;
   const remote = await window.HouseHelperSync.getMedia(key);
   if (remote) await saveEvidenceLocal(key, remote);
@@ -2370,16 +2405,40 @@ async function getEvidence(key) {
 
 async function deleteEvidence(key) {
   const db = await openEvidenceDb();
-  await new Promise((resolve) => {
-    const tx = db.transaction("photos", "readwrite");
-    tx.objectStore("photos").delete(key);
-    tx.oncomplete = resolve;
-    tx.onerror = resolve;
-  });
+  try {
+    await new Promise((resolve) => {
+      const tx = db.transaction("photos", "readwrite");
+      tx.objectStore("photos").delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+      tx.onabort = resolve;
+    });
+  } finally {
+    db.close();
+  }
   if (window.HouseHelperSync) await window.HouseHelperSync.deleteMedia(key);
 }
 
 const MAX_CHORE_PHOTOS = 6;
+
+function withTimeout(promise, milliseconds, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message || "Operation timed out")), milliseconds);
+    Promise.resolve(promise).then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    }, (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+function photoMimeType(file) {
+  if (file && /^image\//i.test(file.type || "")) return file.type;
+  const extension = String(file && file.name || "").split(".").pop().toLowerCase();
+  return { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", heic: "image/heic", heif: "image/heif" }[extension] || "application/octet-stream";
+}
 
 function photoDateLabel(photo) {
   if (!photo || !photo.takenAt) return "Date unavailable";
@@ -2465,11 +2524,11 @@ async function optimizeEvidencePhoto(file) {
   const source = URL.createObjectURL(file);
   const image = new Image();
   try {
-    await new Promise((resolve, reject) => {
+    await withTimeout(new Promise((resolve, reject) => {
       image.onload = resolve;
       image.onerror = reject;
       image.src = source;
-    });
+    }), 12000, "Photo preview timed out");
     const maxSide = Math.max(image.naturalWidth, image.naturalHeight);
     if (maxSide <= 2048 && file.size <= 2.5 * 1024 * 1024) return file;
     const scale = Math.min(1, 2048 / maxSide);
@@ -2480,7 +2539,7 @@ async function optimizeEvidencePhoto(file) {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", .86));
+    return await withTimeout(new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", .86)), 12000, "Photo resize timed out");
   } catch {
     return file;
   } finally {
@@ -2496,8 +2555,14 @@ function clearSelectedPhotoFiles() {
 function renderSelectedPhotoFiles() {
   const grid = $("#photoPreviewGrid");
   grid.innerHTML = state.selectedPhotoFiles.map((photo, index) => '<article class="photo-preview-card">' +
-    (photo.canPreview ? '<img src="' + photo.previewUrl + '" alt="Selected chore photo ' + (index + 1) + '">' : '<span class="photo-file-fallback">' + escapeHtml(photo.file.name || "Photo file") + "</span>") +
+    (photo.canPreview ? '<img src="' + photo.previewUrl + '" alt="Selected chore photo ' + (index + 1) + '">' : '<span class="photo-file-fallback">Preview unavailable<br>' + escapeHtml(photo.name || "Photo file") + "</span>") +
     '<small>' + escapeHtml(photoDateLabel(photo)) + '</small><button type="button" data-remove-selected-photo="' + index + '" aria-label="Remove photo ' + (index + 1) + '">×</button></article>').join("");
+  $$(".photo-preview-card img", grid).forEach((image, index) => image.addEventListener("error", () => {
+    const fallback = document.createElement("span");
+    fallback.className = "photo-file-fallback";
+    fallback.textContent = "Preview unavailable: " + (state.selectedPhotoFiles[index] && state.selectedPhotoFiles[index].name || "photo");
+    image.replaceWith(fallback);
+  }, { once: true }));
   const count = state.selectedPhotoFiles.length;
   $("#photoSelectionSummary").textContent = count ? count + " of " + MAX_CHORE_PHOTOS + " photos ready. Tap above to add more." : "No photos selected yet.";
   $("#savePhotoButton").disabled = count === 0;
@@ -2507,7 +2572,7 @@ function renderSelectedPhotoFiles() {
 async function addSelectedPhotoFiles(files) {
   const candidates = Array.from(files || []);
   if (!candidates.length) return;
-  const known = new Set(state.selectedPhotoFiles.map((photo) => [photo.file.name, photo.file.size, photo.file.lastModified].join(":")));
+  const known = new Set(state.selectedPhotoFiles.map((photo) => [photo.name, photo.originalSize, photo.lastModified].join(":")));
   const available = MAX_CHORE_PHOTOS - state.selectedPhotoFiles.length;
   const accepted = candidates.filter((file) => /^image\//i.test(file.type || "") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || "")).filter((file) => {
     const signature = [file.name, file.size, file.lastModified].join(":");
@@ -2520,12 +2585,31 @@ async function addSelectedPhotoFiles(files) {
     return;
   }
   $("#savePhotoButton").disabled = true;
-  $("#photoSelectionSummary").textContent = "Reading photo dates...";
+  $("#photoSelectionSummary").textContent = "Copying photos into HouseHelper...";
+  let failed = 0;
   for (const file of accepted) {
-    const date = await photoDateInfo(file);
-    state.selectedPhotoFiles.push({ file, previewUrl: URL.createObjectURL(file), canPreview: /^image\/(jpeg|png|webp|gif)$/i.test(file.type || ""), ...date });
+    try {
+      if (!file.size) throw new Error("Empty photo");
+      const date = await withTimeout(photoDateInfo(file), 10000, "Photo date timed out");
+      const bytes = await withTimeout(file.arrayBuffer(), 30000, "Photo copy timed out");
+      if (!bytes.byteLength) throw new Error("Empty photo");
+      const type = photoMimeType(file);
+      const blob = new Blob([bytes], { type });
+      state.selectedPhotoFiles.push({
+        blob,
+        name: file.name || "Chore photo",
+        originalSize: file.size,
+        lastModified: file.lastModified,
+        previewUrl: URL.createObjectURL(blob),
+        canPreview: /^image\/(jpeg|png|webp|gif)$/i.test(type),
+        ...date,
+      });
+    } catch {
+      failed += 1;
+    }
   }
   renderSelectedPhotoFiles();
+  if (failed) showToast(failed + (failed === 1 ? " photo could" : " photos could") + " not be read. Try choosing again.");
   if (candidates.length > accepted.length && state.selectedPhotoFiles.length >= MAX_CHORE_PHOTOS) showToast("Added the first " + MAX_CHORE_PHOTOS + " photos");
 }
 
@@ -2553,19 +2637,77 @@ async function clearPhaseEvidence(choreId, record, phase) {
   record[phase + "Photo"] = false;
 }
 
+function selectedPhotoFromEvidence(item, phase, index) {
+  const photo = item.photo || {};
+  const blob = item.blob;
+  return {
+    blob,
+    name: photo.name || phase + " photo " + (index + 1),
+    originalSize: blob.size || photo.size || 0,
+    lastModified: photo.takenAt ? Date.parse(photo.takenAt) || 0 : 0,
+    previewUrl: URL.createObjectURL(blob),
+    canPreview: /^image\/(jpeg|png|webp|gif)$/i.test(blob.type || photo.type || ""),
+    takenAt: photo.takenAt,
+    dateSource: photo.dateSource,
+  };
+}
+
+async function openEvidenceEditor(phase, authorized) {
+  const chore = choreById(state.detailChoreId);
+  if (!chore || !["before", "after"].includes(phase)) return;
+  const parentView = PROFILES[state.profile].adult || state.profile === "family";
+  const ownUnapprovedChore = chore.person === state.profile && choreStatus(chore) !== "done";
+  if (!parentView && !ownUnapprovedChore) return showToast("An adult must edit approved chore photos");
+  if (state.profile === "family" && !authorized) return requestParentAuth({ action: "editEvidence", choreId: chore.id, phase });
+  clearSelectedPhotoFiles();
+  const editing = { choreId: chore.id, phase, token: makeId("edit") };
+  state.editingEvidence = editing;
+  state.returnToChoreDetailId = chore.id;
+  state.activeChore = null;
+  $("#photoEyebrow").textContent = "Edit chore proof";
+  $("#photoTitle").textContent = "Edit " + phase + " photos";
+  $("#photoHelp").textContent = "Add or remove photos without resetting the chore, its approval state, or its points history.";
+  $("#skipPhotoButton").hidden = true;
+  $("#chorePhoto").value = "";
+  $("#chorePhoto").disabled = true;
+  $("#photoSelectionSummary").textContent = "Loading saved photos...";
+  $("#savePhotoButton").disabled = true;
+  elements.choreDetailDialog.close();
+  elements.photoDialog.showModal();
+  try {
+    const record = state.chores[chore.id] || {};
+    const evidence = await withTimeout(loadPhaseEvidence(chore.id, record, phase), 15000, "Saved photos took too long to load");
+    if (state.editingEvidence !== editing || !elements.photoDialog.open) return;
+    state.selectedPhotoFiles = evidence.slice(0, MAX_CHORE_PHOTOS).map((item, index) => selectedPhotoFromEvidence(item, phase, index));
+    renderSelectedPhotoFiles();
+  } catch {
+    if (state.editingEvidence !== editing || !elements.photoDialog.open) return;
+    renderSelectedPhotoFiles();
+    showToast("Saved photos could not be loaded. You can still add replacements.");
+  } finally {
+    if (state.editingEvidence === editing) $("#chorePhoto").disabled = false;
+  }
+}
+
 function openPhotoDialog(item) {
   state.activeChore = item;
+  state.editingEvidence = null;
+  state.returnToChoreDetailId = null;
   clearSelectedPhotoFiles();
   const finishing = item.dataset.state === "in-progress";
   const name = $(".chore-copy strong", item).textContent;
   $("#photoTitle").textContent = (finishing ? "Add after" : "Add before") + " photos";
+  $("#photoEyebrow").textContent = "Chore proof";
   $("#photoHelp").textContent = finishing ? "Show the finished result for “" + name + ".” Add up to six views. Points stay pending until an adult reviews the before and after photos." : "Show the starting condition for “" + name + ".” Add up to six views so an adult can make a fair comparison.";
   $("#chorePhoto").value = "";
+  $("#chorePhoto").disabled = false;
+  $("#skipPhotoButton").hidden = false;
   renderSelectedPhotoFiles();
   elements.photoDialog.showModal();
 }
 
 async function completePhotoStep(withPhoto) {
+  if (state.editingEvidence) return withPhoto ? saveEditedEvidence() : false;
   const item = state.activeChore;
   if (!item) return false;
   if (withPhoto && !state.selectedPhotoFiles.length) return false;
@@ -2583,16 +2725,18 @@ async function completePhotoStep(withPhoto) {
   try {
     const metadata = [];
     if (withPhoto) {
-      for (const selected of state.selectedPhotoFiles) {
-        const blob = await optimizeEvidencePhoto(selected.file);
+      for (let index = 0; index < state.selectedPhotoFiles.length; index += 1) {
+        const selected = state.selectedPhotoFiles[index];
+        button.textContent = "Saving " + (index + 1) + " of " + state.selectedPhotoFiles.length + "...";
+        const blob = await optimizeEvidencePhoto(selected.blob);
         const key = id + ":" + phase + ":" + makeId("photo");
-        await saveEvidence(key, blob);
         savedKeys.push(key);
+        await withTimeout(saveEvidence(key, blob), 15000, "Photo save timed out");
         metadata.push({
           key,
-          name: selected.file.name || phase + " photo",
-          type: blob.type || selected.file.type || "image/jpeg",
-          size: blob.size || selected.file.size || 0,
+          name: selected.name || phase + " photo",
+          type: blob.type || selected.blob.type || "image/jpeg",
+          size: blob.size || selected.originalSize || 0,
           takenAt: selected.takenAt,
           dateSource: selected.dateSource,
           addedAt: new Date().toISOString(),
@@ -2638,9 +2782,55 @@ async function completePhotoStep(withPhoto) {
     renderAll();
     return true;
   } catch {
-    await Promise.all(savedKeys.map(deleteEvidence));
+    await Promise.allSettled(savedKeys.map((key) => withTimeout(deleteEvidence(key), 8000, "Photo cleanup timed out")));
     renderSelectedPhotoFiles();
     showToast("The photos could not be saved. Please try again.");
+    return false;
+  }
+}
+
+async function saveEditedEvidence() {
+  const editing = state.editingEvidence;
+  if (!editing || !state.selectedPhotoFiles.length) return false;
+  const currentRecord = state.chores[editing.choreId] || {};
+  const record = { ...currentRecord };
+  const oldKeys = phasePhotoMetadata(currentRecord, editing.phase, editing.choreId).map((photo) => photo.key);
+  oldKeys.push(editing.choreId + ":" + editing.phase);
+  const savedKeys = [];
+  const metadata = [];
+  const button = $("#savePhotoButton");
+  button.disabled = true;
+  try {
+    for (let index = 0; index < state.selectedPhotoFiles.length; index += 1) {
+      const selected = state.selectedPhotoFiles[index];
+      button.textContent = "Saving " + (index + 1) + " of " + state.selectedPhotoFiles.length + "...";
+      const blob = await optimizeEvidencePhoto(selected.blob);
+      const key = editing.choreId + ":" + editing.phase + ":" + makeId("photo");
+      savedKeys.push(key);
+      await withTimeout(saveEvidence(key, blob), 15000, "Photo save timed out");
+      metadata.push({
+        key,
+        name: selected.name || editing.phase + " photo",
+        type: blob.type || selected.blob.type || "image/jpeg",
+        size: blob.size || selected.originalSize || 0,
+        takenAt: selected.takenAt,
+        dateSource: selected.dateSource,
+        addedAt: new Date().toISOString(),
+      });
+    }
+    record[editing.phase + "Photos"] = metadata;
+    record[editing.phase + "Photo"] = true;
+    state.chores[editing.choreId] = record;
+    persistChores();
+    Promise.allSettled([...new Set(oldKeys)].map((key) => withTimeout(deleteEvidence(key), 8000, "Old photo cleanup timed out")));
+    const chore = choreById(editing.choreId);
+    if (chore) logActivity("Updated " + editing.phase + " photos for chore “" + chore.title + "”", "📷", "chores");
+    showToast("Chore photos updated. Progress and history were kept.");
+    return true;
+  } catch {
+    await Promise.allSettled(savedKeys.map((key) => withTimeout(deleteEvidence(key), 8000, "Photo cleanup timed out")));
+    renderSelectedPhotoFiles();
+    showToast("The photos could not be updated. The previous photos are still safe.");
     return false;
   }
 }
@@ -2692,6 +2882,9 @@ async function openChoreDetail(choreId) {
   $("#reviewFeedbackReason").textContent = returned ? record.reviewReason : "";
   $("#reviewFeedbackTitle").textContent = returned ? "Returned by " + (record.returnedBy || "an adult") : "Returned for another try";
   $("#reviewFeedbackImageButton").hidden = true;
+  const canEditEvidence = canReviewFromCurrentView() || chore.person === state.profile && status !== "done";
+  $("#editBeforeEvidenceButton").hidden = !canEditEvidence;
+  $("#editAfterEvidenceButton").hidden = !canEditEvidence;
   elements.choreDetailDialog.showModal();
   try {
     const evidence = await Promise.all([loadPhaseEvidence(choreId, record, "before"), loadPhaseEvidence(choreId, record, "after"), returned && record.reviewMarkup ? getEvidence(choreId + ":feedback") : null]);
@@ -2869,6 +3062,11 @@ async function submitParentAuth() {
     if (context.action === "devices") openConnectedDevices();
     if (context.action === "familySetup") openFamilySetup();
     if (context.action === "addChore") openChoreForm(true);
+    if (context.action === "editChore") openChoreForm(true, context.choreId);
+    if (context.action === "editEvidence") {
+      state.detailChoreId = context.choreId;
+      await openEvidenceEditor(context.phase, true);
+    }
     if (context.action === "manageRewards") openRewardManager(context.rewardOwner, true);
     if (context.action === "languageSettings") openLanguageSettings();
     if (context.action === "addListItem") finishPendingListItem(parentId);
@@ -3129,15 +3327,21 @@ function toggleArtworkArchive() {
   showToast(piece.archived ? "Artwork moved to the archive" : "Artwork restored to the show");
 }
 
-function openChoreForm(authorized) {
+function openChoreForm(authorized, choreId) {
   if (!PROFILES[state.profile].adult && !authorized) return;
+  const chore = choreId ? choreById(choreId) : null;
+  state.editingChoreId = chore ? chore.id : null;
   $("#choreForm").reset();
-  $("#choreAssigneeInput").value = state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
-  $("#choreDueDateInput").value = datePlus(0);
-  $("#choreDueTimeInput").value = "18:00";
-  $("#chorePointsInput").value = "10";
-  $("#chorePhotoRequiredInput").checked = true;
-  $("#choreRepeatInput").value = "none";
+  $("#choreFormTitle").textContent = chore ? "Edit chore" : "Add a chore";
+  $("#saveChoreButton").textContent = chore ? "Save changes" : "Add chore";
+  $("#choreTitleInput").value = chore ? chore.title : "";
+  $("#choreAssigneeInput").value = chore ? chore.person : state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
+  $("#choreAreaInput").value = chore ? chore.area : "";
+  $("#choreDueDateInput").value = chore ? chore.dueDate || datePlus(0) : datePlus(0);
+  $("#choreDueTimeInput").value = chore ? chore.dueTime || "18:00" : "18:00";
+  $("#chorePointsInput").value = chore ? Math.max(0, Number(chore.points) || 0) : "10";
+  $("#chorePhotoRequiredInput").checked = chore ? chore.photoRequired !== false : true;
+  $("#choreRepeatInput").value = chore ? chore.repeat || "none" : "none";
   elements.choreFormDialog.showModal();
   setTimeout(() => $("#choreTitleInput").focus(), 0);
 }
@@ -3147,17 +3351,38 @@ function openRewardManager(owner, authorized) {
   if (!owner || !state.rewards[owner]) return showToast("Add a child profile before creating rewards");
   state.rewardOwner = owner;
   state.rewardDraftPoints = currentReward().points;
+  state.editingRewardId = null;
   $("#dialogPoints").textContent = state.rewardDraftPoints;
-  $("#rewardNameInput").value = "";
-  $("#rewardTargetInput").value = "";
-  $("#rewardEmojiInput").value = "🎁";
+  $("#rewardBalanceInput").value = state.rewardDraftPoints;
+  resetRewardEditor();
   renderManagedRewardList();
   renderRewards();
   elements.rewardDialog.showModal();
 }
 
 function renderManagedRewardList() {
-  $("#managedRewardList").innerHTML = currentReward().items.map((item) => '<div class="managed-reward-row" data-managed-reward="' + item.id + '"><span>' + escapeHtml(item.emoji) + '</span><span><strong>' + escapeHtml(item.name) + "</strong><small>Reward choice</small></span><b>" + item.cost + ' pts</b><button data-delete-reward="' + item.id + '" type="button" aria-label="Remove ' + escapeHtml(item.name) + '">×</button></div>').join("") || '<div class="empty-state compact"><strong>No rewards yet</strong><span>Add one below.</span></div>';
+  $("#managedRewardList").innerHTML = currentReward().items.map((item) => '<div class="managed-reward-row" data-managed-reward="' + item.id + '"><span>' + escapeHtml(item.emoji) + '</span><span><strong>' + escapeHtml(item.name) + "</strong><small>Reward choice</small></span><b>" + item.cost + ' pts</b><button class="managed-reward-edit" data-edit-reward="' + item.id + '" type="button" aria-label="Edit ' + escapeHtml(item.name) + '">✎</button><button data-delete-reward="' + item.id + '" type="button" aria-label="Remove ' + escapeHtml(item.name) + '">×</button></div>').join("") || '<div class="empty-state compact"><strong>No rewards yet</strong><span>Add one below.</span></div>';
+}
+
+function resetRewardEditor() {
+  state.editingRewardId = null;
+  $("#rewardEditorLabel").textContent = "New reward";
+  $("#rewardNameInput").value = "";
+  $("#rewardTargetInput").value = "";
+  $("#rewardEmojiInput").value = "🎁";
+  $("#cancelRewardEditButton").hidden = true;
+}
+
+function editManagedReward(rewardId) {
+  const item = currentReward().items.find((reward) => reward.id === rewardId);
+  if (!item) return;
+  state.editingRewardId = item.id;
+  $("#rewardEditorLabel").textContent = "Edit reward";
+  $("#rewardNameInput").value = item.name;
+  $("#rewardTargetInput").value = item.cost;
+  $("#rewardEmojiInput").value = item.emoji;
+  $("#cancelRewardEditButton").hidden = false;
+  $("#rewardNameInput").focus();
 }
 
 function openRewardClaim(owner, rewardId) {
@@ -3303,6 +3528,19 @@ function openArtViewer(artId) {
   $("#artViewerArtist").textContent = "By " + piece.artist;
   $("#archiveArtworkButton").textContent = piece.archived ? "Restore to showcase" : "Archive piece";
   elements.artViewerDialog.showModal();
+}
+
+function openArtworkEditor() {
+  const piece = state.artworks.find((item) => item.id === state.activeArtId);
+  if (!piece) return;
+  state.artReplacementData = null;
+  $("#artEditTitleInput").value = piece.title || "Family artwork";
+  $("#artEditArtistInput").value = piece.artist || profileName(state.profile);
+  $("#artReplacementInput").value = "";
+  $("#artReplacementStatus").textContent = "Keep the current image";
+  if (elements.artViewerDialog.open) elements.artViewerDialog.close();
+  elements.artEditDialog.showModal();
+  setTimeout(() => $("#artEditTitleInput").focus(), 0);
 }
 
 function clearPainting() {
@@ -3789,12 +4027,21 @@ $("#homeRewardChoices").addEventListener("click", (event) => {
 $$("[data-points]").forEach((button) => button.addEventListener("click", () => {
   state.rewardDraftPoints = Math.max(0, state.rewardDraftPoints + Number(button.dataset.points));
   $("#dialogPoints").textContent = state.rewardDraftPoints;
+  $("#rewardBalanceInput").value = state.rewardDraftPoints;
 }));
+$("#rewardBalanceInput").addEventListener("input", (event) => {
+  state.rewardDraftPoints = Math.max(0, Math.min(999999, Number(event.target.value) || 0));
+  $("#dialogPoints").textContent = state.rewardDraftPoints;
+});
+$("#cancelRewardEditButton").addEventListener("click", resetRewardEditor);
 
 $("#managedRewardList").addEventListener("click", (event) => {
+  const edit = event.target.closest("[data-edit-reward]");
+  if (edit) return editManagedReward(edit.dataset.editReward);
   const button = event.target.closest("[data-delete-reward]");
   if (!button) return;
   currentReward().items = currentReward().items.filter((item) => item.id !== button.dataset.deleteReward);
+  if (state.editingRewardId === button.dataset.deleteReward) resetRewardEditor();
   persistRewards();
   renderManagedRewardList();
   renderRewards();
@@ -3810,10 +4057,13 @@ $("#rewardForm").addEventListener("submit", (event) => {
     showToast("Add a reward name and a cost of at least 10 points");
     return;
   }
-  currentReward().points = state.rewardDraftPoints;
-  if (name) currentReward().items.push({ id: makeId("reward"), name: name, cost: cost, emoji: $("#rewardEmojiInput").value.trim() || "🎁" });
+  currentReward().points = Math.max(0, Math.min(999999, Number($("#rewardBalanceInput").value) || 0));
+  const editing = state.editingRewardId ? currentReward().items.find((item) => item.id === state.editingRewardId) : null;
+  if (name && editing) Object.assign(editing, { name: name, cost: cost, emoji: $("#rewardEmojiInput").value.trim() || "🎁" });
+  else if (name) currentReward().items.push({ id: makeId("reward"), name: name, cost: cost, emoji: $("#rewardEmojiInput").value.trim() || "🎁" });
   persistRewards();
-  logActivity("Updated " + rewardOwnerName() + "’s reward shop" + (name ? " and added “" + name + "”" : ""), "★", "rewards");
+  logActivity("Updated " + rewardOwnerName() + "’s reward shop" + (name ? (editing ? " and edited “" : " and added “") + name + "”" : ""), "★", "rewards");
+  state.editingRewardId = null;
   elements.rewardDialog.close();
   renderAll();
   showToast(rewardOwnerName() + "’s reward choices updated");
@@ -3845,6 +4095,12 @@ $("#claimNoticePanel").addEventListener("click", (event) => {
 });
 
 function handleChoreListClick(event) {
+  const edit = event.target.closest("[data-edit-chore]");
+  if (edit) {
+    if (PROFILES[state.profile].adult) openChoreForm(true, edit.dataset.editChore);
+    else requestParentAuth({ action: "editChore", choreId: edit.dataset.editChore });
+    return;
+  }
   const remove = event.target.closest("[data-delete-chore]");
   if (remove) {
     openDeleteConfirm("chore", remove.dataset.deleteChore);
@@ -3895,11 +4151,19 @@ $("#photoForm").addEventListener("submit", async (event) => {
   if (await completePhotoStep(value === "save")) elements.photoDialog.close();
 });
 elements.photoDialog.addEventListener("close", () => {
+  const reopenChoreId = state.returnToChoreDetailId;
   clearSelectedPhotoFiles();
   state.activeChore = null;
+  state.editingEvidence = null;
+  state.returnToChoreDetailId = null;
+  $("#photoEyebrow").textContent = "Chore proof";
+  $("#skipPhotoButton").hidden = false;
+  if (reopenChoreId) setTimeout(() => openChoreDetail(reopenChoreId), 0);
 });
 
 $("#closeChoreDetail").addEventListener("click", () => elements.choreDetailDialog.close());
+$("#editBeforeEvidenceButton").addEventListener("click", () => openEvidenceEditor("before"));
+$("#editAfterEvidenceButton").addEventListener("click", () => openEvidenceEditor("after"));
 $("#choreDetailDialog").addEventListener("click", (event) => {
   const evidenceButton = event.target.closest("[data-evidence-url]");
   if (evidenceButton) openEvidenceViewer(evidenceButton.dataset.evidenceUrl, evidenceButton.dataset.evidenceCaption + " · " + $("#detailTitle").textContent);
@@ -3980,8 +4244,10 @@ $("#choreForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const assignee = $("#choreAssigneeInput").value;
   const points = Math.max(0, Number($("#chorePointsInput").value) || 0);
+  const existing = state.editingChoreId ? choreById(state.editingChoreId) : null;
   const chore = {
-    id: makeId("chore"),
+    ...(existing || {}),
+    id: existing ? existing.id : makeId("chore"),
     person: assignee,
     title: $("#choreTitleInput").value.trim(),
     area: $("#choreAreaInput").value.trim(),
@@ -3993,19 +4259,30 @@ $("#choreForm").addEventListener("submit", (event) => {
     repeat: $("#choreRepeatInput").value,
     photoRequired: $("#chorePhotoRequiredInput").checked || points > 0 && isChildProfile(assignee),
     familyPriority: true,
-    createdBy: state.profile,
+    createdBy: existing && existing.createdBy || state.profile,
   };
   if (!chore.title || !chore.area) {
     showToast("Add a chore name and room");
     return;
   }
-  state.customChores.push(chore);
+  const existingIndex = state.customChores.findIndex((item) => item.id === chore.id);
+  if (existingIndex >= 0) state.customChores[existingIndex] = chore;
+  else {
+    if (existing && !state.removedChoreIds.includes(chore.id)) {
+      state.removedChoreIds.push(chore.id);
+      persistRemovedChores();
+    }
+    state.customChores.push(chore);
+  }
   persistCustomChores();
-  logActivity("Assigned chore “" + chore.title + "” to " + PROFILES[assignee].name, "✓", "chores");
+  logActivity((existing ? "Updated chore “" : "Assigned chore “") + chore.title + "”" + (existing ? " for " : " to ") + PROFILES[assignee].name, "✓", "chores");
+  const wasEditing = Boolean(existing);
+  state.editingChoreId = null;
   elements.choreFormDialog.close();
   renderAll();
-  showToast(chore.title + " assigned to " + PROFILES[assignee].name);
+  showToast(wasEditing ? chore.title + " updated without resetting its progress" : chore.title + " assigned to " + PROFILES[assignee].name);
 });
+elements.choreFormDialog.addEventListener("close", () => { state.editingChoreId = null; });
 
 $("#closeDeleteConfirm").addEventListener("click", () => elements.deleteConfirmDialog.close());
 $("#cancelDeleteConfirm").addEventListener("click", () => elements.deleteConfirmDialog.close());
@@ -4212,12 +4489,20 @@ $("#calendarEventForm").addEventListener("submit", (event) => {
   showToast(existingIndex >= 0 ? "Calendar event updated" : "Added to the family calendar");
 });
 
-function openHabitDialog() {
+function openHabitDialog(habitId) {
+  const habit = habitId ? state.habits.find((item) => item.id === habitId) : null;
+  if (habit && isChildProfile(state.profile) && habit.person !== state.profile) return;
+  state.editingHabitId = habit ? habit.id : null;
   $("#habitForm").reset();
   const isKid = isChildProfile(state.profile);
-  $("#habitPersonInput").value = isKid ? state.profile : state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
+  $("#habitFormTitle").textContent = habit ? "Edit family habit" : "Add a family habit";
+  $("#saveHabitButton").textContent = habit ? "Save changes" : "Add habit";
+  $("#habitNameInput").value = habit ? habit.name : "";
+  $("#habitPersonInput").value = habit ? habit.person : isKid ? state.profile : state.profile === "family" ? firstChildId() || firstAdultId() : state.profile;
   $("#habitPersonInput").disabled = isKid;
-  $("#habitTimeInput").value = "19:00";
+  $("#habitIconInput").value = habit ? habit.icon : "🪥";
+  $("#habitScheduleInput").value = habit ? habit.schedule : "daily";
+  $("#habitTimeInput").value = habit ? habit.time || "19:00" : "19:00";
   elements.habitDialog.showModal();
   setTimeout(() => $("#habitNameInput").focus(), 0);
 }
@@ -4228,16 +4513,23 @@ $("#habitForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const name = $("#habitNameInput").value.trim();
   if (!name) return;
-  const habit = { id: makeId("habit"), person: $("#habitPersonInput").value, name: name, icon: $("#habitIconInput").value, schedule: $("#habitScheduleInput").value, time: $("#habitTimeInput").value };
-  state.habits.push(habit);
+  const existingIndex = state.habits.findIndex((item) => item.id === state.editingHabitId);
+  const existing = existingIndex >= 0 ? state.habits[existingIndex] : null;
+  const habit = { ...(existing || {}), id: existing ? existing.id : makeId("habit"), person: $("#habitPersonInput").value, name: name, icon: $("#habitIconInput").value, schedule: $("#habitScheduleInput").value, time: $("#habitTimeInput").value };
+  if (existingIndex >= 0) state.habits[existingIndex] = habit;
+  else state.habits.push(habit);
   persistHabits();
-  logActivity("Added habit “" + habit.name + "” for " + PROFILES[habit.person].name, habit.icon);
+  logActivity((existing ? "Updated habit “" : "Added habit “") + habit.name + "” for " + PROFILES[habit.person].name, habit.icon);
+  state.editingHabitId = null;
   elements.habitDialog.close();
   renderHabits();
-  showToast("New habit added for " + PROFILES[habit.person].name);
+  showToast(existing ? "Habit updated. Its streak history was kept." : "New habit added for " + PROFILES[habit.person].name);
 });
+elements.habitDialog.addEventListener("close", () => { state.editingHabitId = null; });
 
 function handleHabitClick(event) {
+  const edit = event.target.closest("[data-edit-habit]");
+  if (edit) return openHabitDialog(edit.dataset.editHabit);
   const remove = event.target.closest("[data-delete-habit]");
   if (remove) return openDeleteConfirm("habit", remove.dataset.deleteHabit);
   const toggle = event.target.closest("[data-toggle-habit]");
@@ -4273,6 +4565,8 @@ $("#closeListIdentity").addEventListener("click", () => {
   state.pendingListItem = null;
 });
 function handleListClick(event) {
+  const edit = event.target.closest("[data-edit-list]");
+  if (edit) return openListEditDialog(edit.dataset.editList);
   const remove = event.target.closest("[data-delete-list]");
   if (remove) return openDeleteConfirm("list", remove.dataset.deleteList);
   const toggle = event.target.closest("[data-toggle-list]");
@@ -4280,6 +4574,24 @@ function handleListClick(event) {
 }
 $("#homeListItems").addEventListener("click", handleListClick);
 $("#sharedList").addEventListener("click", handleListClick);
+$("#listEditForm").addEventListener("submit", (event) => {
+  if (!event.submitter || event.submitter.value !== "save") return;
+  event.preventDefault();
+  const item = state.listItems.find((entry) => entry.id === state.editingListId);
+  const text = $("#listEditTextInput").value.trim();
+  if (!item || !text) return;
+  const oldText = item.text;
+  item.text = text;
+  item.category = $("#listEditCategoryInput").value;
+  item.updatedAt = new Date().toISOString();
+  persistListItems();
+  state.editingListId = null;
+  elements.listEditDialog.close();
+  renderLists();
+  logActivity("Updated list item “" + oldText + "” to “" + item.text + "”", "☰", "lists");
+  showToast("List item updated");
+});
+elements.listEditDialog.addEventListener("close", () => { state.editingListId = null; });
 $("#listFilters").addEventListener("click", (event) => {
   const button = event.target.closest("[data-list-filter]");
   if (!button) return;
@@ -4308,12 +4620,50 @@ function handleArtClick(event) {
 $("#artWall").addEventListener("click", handleArtClick);
 $("#fullArtWall").addEventListener("click", handleArtClick);
 $("#closeArtViewer").addEventListener("click", () => elements.artViewerDialog.close());
+$("#editArtworkButton").addEventListener("click", openArtworkEditor);
 $("#archiveArtworkButton").addEventListener("click", toggleArtworkArchive);
 $("#deleteArtworkButton").addEventListener("click", () => {
   const artId = state.activeArtId;
   elements.artViewerDialog.close();
   if (artId) openDeleteConfirm("art", artId);
 });
+$("#artReplacementInput").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  $("#artReplacementStatus").textContent = "Preparing replacement image...";
+  try {
+    state.artReplacementData = await withTimeout(fileToArtworkData(file), 30000, "Artwork preparation timed out");
+    $("#artReplacementStatus").textContent = "Replacement ready: " + (file.name || "selected image");
+  } catch {
+    state.artReplacementData = null;
+    event.target.value = "";
+    $("#artReplacementStatus").textContent = "That image could not be prepared";
+  }
+});
+$("#artEditForm").addEventListener("submit", (event) => {
+  if (!event.submitter || event.submitter.value !== "save") return;
+  event.preventDefault();
+  const piece = state.artworks.find((item) => item.id === state.activeArtId);
+  const title = $("#artEditTitleInput").value.trim();
+  const artist = $("#artEditArtistInput").value.trim();
+  if (!piece || !title || !artist) return;
+  piece.title = title;
+  piece.artist = artist;
+  if (state.artReplacementData) {
+    piece.type = "image";
+    piece.data = state.artReplacementData;
+    delete piece.content;
+    delete piece.className;
+  }
+  piece.updatedAt = new Date().toISOString();
+  persistArtworks();
+  state.artReplacementData = null;
+  elements.artEditDialog.close();
+  renderArt();
+  logActivity("Updated artwork “" + piece.title + "”", "🖼", "other");
+  showToast("Artwork updated");
+});
+elements.artEditDialog.addEventListener("close", () => { state.artReplacementData = null; });
 $("#showArchiveButton").addEventListener("click", () => {
   state.showArchivedArt = !state.showArchivedArt;
   renderArt();

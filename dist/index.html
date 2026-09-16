@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.6.1" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.2" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -312,7 +312,7 @@
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
           <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.1</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.2</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -324,8 +324,8 @@
         <div class="dialog-body">
           <div class="detail-status" id="detailStatus"></div>
           <div class="evidence-grid">
-            <figure><figcaption>Before photos. Tap any photo to enlarge.</figcaption><div class="evidence-photo-list" id="beforeEvidenceList"></div><span class="evidence-empty" id="beforeEmpty">No photos posted</span></figure>
-            <figure><figcaption>After photos. Tap any photo to enlarge.</figcaption><div class="evidence-photo-list" id="afterEvidenceList"></div><span class="evidence-empty" id="afterEmpty">No photos posted</span></figure>
+            <figure><div class="evidence-heading"><figcaption>Before photos. Tap any photo to enlarge.</figcaption><button class="text-button" id="editBeforeEvidenceButton" type="button">Edit photos</button></div><div class="evidence-photo-list" id="beforeEvidenceList"></div><span class="evidence-empty" id="beforeEmpty">No photos posted</span></figure>
+            <figure><div class="evidence-heading"><figcaption>After photos. Tap any photo to enlarge.</figcaption><button class="text-button" id="editAfterEvidenceButton" type="button">Edit photos</button></div><div class="evidence-photo-list" id="afterEvidenceList"></div><span class="evidence-empty" id="afterEmpty">No photos posted</span></figure>
           </div>
           <div class="chore-review-feedback" id="choreReviewFeedback" hidden><div><span>↩</span><div><strong id="reviewFeedbackTitle">Returned for another try</strong><p id="reviewFeedbackReason"></p></div></div><button class="feedback-image-frame" id="reviewFeedbackImageButton" type="button" hidden><img id="reviewFeedbackImage" alt="Adult markup showing what needs attention" /><span>Tap to view adult markup</span></button></div>
           <div class="approval-record" id="approvalRecord"></div>
@@ -336,7 +336,7 @@
 
     <dialog id="choreFormDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="choreForm">
-        <div class="dialog-header"><div><p class="eyebrow">Adult chore builder</p><h2>Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Adult chore builder</p><h2 id="choreFormTitle">Add a chore</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>What needs doing?</span><input id="choreTitleInput" maxlength="60" placeholder="Clean the bathroom mirror" required /></label>
           <label class="field"><span>Assign to</span><select id="choreAssigneeInput" required></select></label>
@@ -347,7 +347,7 @@
           <label class="field field-wide"><span>Repeats</span><select id="choreRepeatInput"><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week on this day</option></select></label>
           <label class="check-field field-wide"><input id="chorePhotoRequiredInput" type="checkbox" checked /><span><strong>Require before and after photos</strong><small>Points remain pending until an adult reviews the evidence.</small></span></label>
         </div>
-        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add chore</button></div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveChoreButton" value="save" type="submit">Add chore</button></div>
       </form>
     </dialog>
 
@@ -467,13 +467,15 @@
           <div class="point-control"><span>Current balance</span><strong><span id="dialogPoints">0</span> pts</strong></div>
           <p class="field-label">Quick adjustment</p>
           <div class="point-buttons"><button type="button" data-points="-5">−5</button><button type="button" data-points="5">+5</button><button type="button" data-points="10">+10</button><button type="button" data-points="20">+20</button></div>
+          <label class="field reward-balance-field"><span>Exact point balance</span><input id="rewardBalanceInput" type="number" min="0" max="999999" inputmode="numeric" value="0" /></label>
           <p class="field-label">Current reward choices</p>
           <div class="managed-reward-list" id="managedRewardList"></div>
           <div class="reward-add-grid">
-            <label class="field"><span>New reward</span><input id="rewardNameInput" maxlength="40" placeholder="Pick Friday’s movie" /></label>
+            <label class="field"><span id="rewardEditorLabel">New reward</span><input id="rewardNameInput" maxlength="40" placeholder="Pick Friday’s movie" /></label>
             <label class="field"><span>Cost</span><input id="rewardTargetInput" type="number" min="10" max="9999" inputmode="numeric" placeholder="75" /></label>
             <label class="field reward-emoji-field"><span>Emoji</span><input id="rewardEmojiInput" maxlength="4" value="🎁" /></label>
           </div>
+          <button class="text-button reward-edit-cancel" id="cancelRewardEditButton" type="button" hidden>Cancel reward edit</button>
           <div class="parent-note"><svg><use href="#icon-star"></use></svg><p><strong>Points require approval.</strong><br /><span id="rewardNoteName">This child</span> earns points only from approved chores.</p></div>
         </div>
         <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveRewardButton" value="default" type="submit">Save changes</button></div>
@@ -506,7 +508,7 @@
 
     <dialog id="habitDialog" class="app-dialog">
       <form method="dialog" class="dialog-panel" id="habitForm">
-        <div class="dialog-header"><div><p class="eyebrow">Build a routine</p><h2>Add a family habit</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-header"><div><p class="eyebrow">Build a routine</p><h2 id="habitFormTitle">Add a family habit</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
         <div class="dialog-body form-grid">
           <label class="field field-wide"><span>Habit</span><input id="habitNameInput" maxlength="60" placeholder="Brush teeth" required /></label>
           <label class="field"><span>For</span><select id="habitPersonInput" required></select></label>
@@ -515,7 +517,15 @@
           <label class="field"><span>Best time</span><input id="habitTimeInput" type="time" value="19:30" required /></label>
           <p class="trust-note field-wide">Children can create and check their own habits. Adults can create routines for anyone.</p>
         </div>
-        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Add habit</button></div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveHabitButton" value="save" type="submit">Add habit</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="listEditDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="listEditForm">
+        <div class="dialog-header"><div><p class="eyebrow">Shared list</p><h2>Edit list item</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid"><label class="field field-wide"><span>Item</span><input id="listEditTextInput" maxlength="60" required /></label><label class="field field-wide"><span>Category</span><select id="listEditCategoryInput"><option value="groceries">Groceries</option><option value="household">Household</option><option value="school">School</option><option value="ideas">Ideas</option></select></label></div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" value="save" type="submit">Save changes</button></div>
       </form>
     </dialog>
 
@@ -533,7 +543,7 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.1</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.2</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
           <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi-Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app runs the household service.</p>
@@ -551,8 +561,16 @@
         <button class="art-viewer-close" id="closeArtViewer" type="button" aria-label="Close full-screen artwork">×</button>
         <div class="art-viewer-stage" id="artViewerStage"></div>
         <div class="art-viewer-caption"><strong id="artViewerTitle">Family artwork</strong><span id="artViewerArtist"></span></div>
-        <div class="art-viewer-actions"><button class="secondary-dark-button" id="archiveArtworkButton" type="button">Archive piece</button><button class="danger-button adult-only" id="deleteArtworkButton" type="button">Delete permanently</button></div>
+        <div class="art-viewer-actions"><button class="secondary-dark-button" id="editArtworkButton" type="button">Edit details</button><button class="secondary-dark-button" id="archiveArtworkButton" type="button">Archive piece</button><button class="danger-button adult-only" id="deleteArtworkButton" type="button">Delete permanently</button></div>
       </div>
+    </dialog>
+
+    <dialog id="artEditDialog" class="app-dialog">
+      <form method="dialog" class="dialog-panel" id="artEditForm">
+        <div class="dialog-header"><div><p class="eyebrow">Art show</p><h2>Edit artwork</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit" formnovalidate>×</button></div>
+        <div class="dialog-body form-grid"><label class="field field-wide"><span>Title</span><input id="artEditTitleInput" maxlength="70" required /></label><label class="field field-wide"><span>Artist</span><input id="artEditArtistInput" maxlength="50" required /></label><label class="static-image-upload field-wide"><input id="artReplacementInput" type="file" accept="image/*" /><span>Replace artwork image</span><small id="artReplacementStatus">Keep the current image</small></label></div>
+        <div class="dialog-footer"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Cancel</button><button class="primary-button" id="saveArtworkEditButton" value="save" type="submit">Save changes</button></div>
+      </form>
     </dialog>
 
     <dialog id="paintDialog" class="paint-dialog">
@@ -604,14 +622,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.6.1" defer></script>
-    <script src="./qr.js?v=0.6.1" defer></script>
-    <script src="./languages.js?v=0.6.1" defer></script>
-    <script src="./language-german-b1.js?v=0.6.1" defer></script>
-    <script src="./language-korean-b1.js?v=0.6.1" defer></script>
-    <script src="./language-world.js?v=0.6.1" defer></script>
-    <script src="./language-more.js?v=0.6.1" defer></script>
-    <script src="./app.js?v=0.6.1" defer></script>
-    <script src="./sync.js?v=0.6.1" defer></script>
+    <script src="./compat.js?v=0.6.2" defer></script>
+    <script src="./qr.js?v=0.6.2" defer></script>
+    <script src="./languages.js?v=0.6.2" defer></script>
+    <script src="./language-german-b1.js?v=0.6.2" defer></script>
+    <script src="./language-korean-b1.js?v=0.6.2" defer></script>
+    <script src="./language-world.js?v=0.6.2" defer></script>
+    <script src="./language-more.js?v=0.6.2" defer></script>
+    <script src="./app.js?v=0.6.2" defer></script>
+    <script src="./sync.js?v=0.6.2" defer></script>
   </body>
 </html>

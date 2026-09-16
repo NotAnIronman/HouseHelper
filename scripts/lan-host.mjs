@@ -7,7 +7,7 @@ import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
-const APP_VERSION = "0.6.1";
+const APP_VERSION = "0.6.2";
 const webRoot = join(projectRoot, "dist");
 const dataRoot = join(projectRoot, ".househelper");
 const mediaRoot = join(dataRoot, "media");
