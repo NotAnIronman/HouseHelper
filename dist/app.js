@@ -3,7 +3,7 @@ function readStoredNumber(key, fallback) {
   return value === null || !Number.isFinite(Number(value)) ? fallback : Number(value);
 }
 
-const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.6.0";
+const APP_VERSION = window.HouseHelperCompat && window.HouseHelperCompat.VERSION || "0.6.1";
 
 function readStoredObject(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -281,9 +281,10 @@ const state = {
   reviewLast: null,
   reviewBaseImage: null,
   reviewImageUrl: null,
+  reviewEvidenceItems: [],
+  reviewPhotoIndex: 0,
   reviewHasMarks: false,
-  selectedPhotoFile: null,
-  photoUrl: null,
+  selectedPhotoFiles: [],
   idleDeadline: null,
   authContext: null,
   authParent: firstAdultId(),
@@ -2378,74 +2379,286 @@ async function deleteEvidence(key) {
   if (window.HouseHelperSync) await window.HouseHelperSync.deleteMedia(key);
 }
 
+const MAX_CHORE_PHOTOS = 6;
+
+function photoDateLabel(photo) {
+  if (!photo || !photo.takenAt) return "Date unavailable";
+  const date = new Date(photo.takenAt);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  const prefix = photo.dateSource === "taken" ? "Taken" : photo.dateSource === "file" ? "File date" : "Added";
+  return prefix + " " + date.toLocaleString();
+}
+
+function parseExifDate(value) {
+  const match = String(value || "").trim().match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6]));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function exifIfdEntry(view, tiffOffset, ifdOffset, littleEndian, tag) {
+  if (ifdOffset < 0 || ifdOffset + 2 > view.byteLength) return null;
+  const count = view.getUint16(ifdOffset, littleEndian);
+  for (let index = 0; index < count; index += 1) {
+    const entry = ifdOffset + 2 + index * 12;
+    if (entry + 12 > view.byteLength) return null;
+    if (view.getUint16(entry, littleEndian) === tag) return entry;
+  }
+  return null;
+}
+
+function exifAscii(view, tiffOffset, entry, littleEndian) {
+  if (entry == null || entry + 12 > view.byteLength || view.getUint16(entry + 2, littleEndian) !== 2) return "";
+  const length = view.getUint32(entry + 4, littleEndian);
+  const start = length <= 4 ? entry + 8 : tiffOffset + view.getUint32(entry + 8, littleEndian);
+  if (!length || start < 0 || start + length > view.byteLength) return "";
+  let value = "";
+  for (let index = 0; index < length - 1; index += 1) value += String.fromCharCode(view.getUint8(start + index));
+  return value;
+}
+
+async function jpegTakenAt(file) {
+  if (!file || !(/jpe?g/i.test(file.type || "") || /\.jpe?g$/i.test(file.name || ""))) return null;
+  try {
+    const header = typeof file.slice === "function" ? file.slice(0, Math.min(file.size || 0, 512 * 1024)) : file;
+    const view = new DataView(await header.arrayBuffer());
+    if (view.byteLength < 12 || view.getUint16(0, false) !== 0xffd8) return null;
+    let offset = 2;
+    while (offset + 4 <= view.byteLength) {
+      if (view.getUint8(offset) !== 0xff) break;
+      const marker = view.getUint8(offset + 1);
+      const segmentLength = view.getUint16(offset + 2, false);
+      if (segmentLength < 2 || offset + 2 + segmentLength > view.byteLength) break;
+      if (marker === 0xe1 && segmentLength >= 14 && view.getUint32(offset + 4, false) === 0x45786966) {
+        const tiffOffset = offset + 10;
+        const byteOrder = view.getUint16(tiffOffset, false);
+        const littleEndian = byteOrder === 0x4949;
+        if (!littleEndian && byteOrder !== 0x4d4d || view.getUint16(tiffOffset + 2, littleEndian) !== 42) return null;
+        const firstIfd = tiffOffset + view.getUint32(tiffOffset + 4, littleEndian);
+        const exifPointer = exifIfdEntry(view, tiffOffset, firstIfd, littleEndian, 0x8769);
+        if (exifPointer != null) {
+          const exifIfd = tiffOffset + view.getUint32(exifPointer + 8, littleEndian);
+          const original = exifAscii(view, tiffOffset, exifIfdEntry(view, tiffOffset, exifIfd, littleEndian, 0x9003), littleEndian);
+          const digitized = exifAscii(view, tiffOffset, exifIfdEntry(view, tiffOffset, exifIfd, littleEndian, 0x9004), littleEndian);
+          const parsed = parseExifDate(original || digitized);
+          if (parsed) return parsed;
+        }
+        return parseExifDate(exifAscii(view, tiffOffset, exifIfdEntry(view, tiffOffset, firstIfd, littleEndian, 0x0132), littleEndian));
+      }
+      offset += 2 + segmentLength;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function photoDateInfo(file) {
+  const embedded = await jpegTakenAt(file);
+  if (embedded) return { takenAt: embedded, dateSource: "taken" };
+  if (file && Number(file.lastModified) > 0) return { takenAt: new Date(file.lastModified).toISOString(), dateSource: "file" };
+  return { takenAt: new Date().toISOString(), dateSource: "added" };
+}
+
+async function optimizeEvidencePhoto(file) {
+  if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) return file;
+  const source = URL.createObjectURL(file);
+  const image = new Image();
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = source;
+    });
+    const maxSide = Math.max(image.naturalWidth, image.naturalHeight);
+    if (maxSide <= 2048 && file.size <= 2.5 * 1024 * 1024) return file;
+    const scale = Math.min(1, 2048 / maxSide);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", .86));
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
+function clearSelectedPhotoFiles() {
+  state.selectedPhotoFiles.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+  state.selectedPhotoFiles = [];
+}
+
+function renderSelectedPhotoFiles() {
+  const grid = $("#photoPreviewGrid");
+  grid.innerHTML = state.selectedPhotoFiles.map((photo, index) => '<article class="photo-preview-card">' +
+    (photo.canPreview ? '<img src="' + photo.previewUrl + '" alt="Selected chore photo ' + (index + 1) + '">' : '<span class="photo-file-fallback">' + escapeHtml(photo.file.name || "Photo file") + "</span>") +
+    '<small>' + escapeHtml(photoDateLabel(photo)) + '</small><button type="button" data-remove-selected-photo="' + index + '" aria-label="Remove photo ' + (index + 1) + '">×</button></article>').join("");
+  const count = state.selectedPhotoFiles.length;
+  $("#photoSelectionSummary").textContent = count ? count + " of " + MAX_CHORE_PHOTOS + " photos ready. Tap above to add more." : "No photos selected yet.";
+  $("#savePhotoButton").disabled = count === 0;
+  $("#savePhotoButton").textContent = count ? "Save " + count + (count === 1 ? " photo" : " photos") : "Save photos";
+}
+
+async function addSelectedPhotoFiles(files) {
+  const candidates = Array.from(files || []);
+  if (!candidates.length) return;
+  const known = new Set(state.selectedPhotoFiles.map((photo) => [photo.file.name, photo.file.size, photo.file.lastModified].join(":")));
+  const available = MAX_CHORE_PHOTOS - state.selectedPhotoFiles.length;
+  const accepted = candidates.filter((file) => /^image\//i.test(file.type || "") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || "")).filter((file) => {
+    const signature = [file.name, file.size, file.lastModified].join(":");
+    if (known.has(signature)) return false;
+    known.add(signature);
+    return true;
+  }).slice(0, available);
+  if (!accepted.length) {
+    showToast(available ? "Choose an image file" : "You can attach up to " + MAX_CHORE_PHOTOS + " photos");
+    return;
+  }
+  $("#savePhotoButton").disabled = true;
+  $("#photoSelectionSummary").textContent = "Reading photo dates...";
+  for (const file of accepted) {
+    const date = await photoDateInfo(file);
+    state.selectedPhotoFiles.push({ file, previewUrl: URL.createObjectURL(file), canPreview: /^image\/(jpeg|png|webp|gif)$/i.test(file.type || ""), ...date });
+  }
+  renderSelectedPhotoFiles();
+  if (candidates.length > accepted.length && state.selectedPhotoFiles.length >= MAX_CHORE_PHOTOS) showToast("Added the first " + MAX_CHORE_PHOTOS + " photos");
+}
+
+function phasePhotoMetadata(record, phase, choreId) {
+  const photos = record && record[phase + "Photos"];
+  if (Array.isArray(photos) && photos.length) return photos.filter((photo) => photo && photo.key);
+  return record && record[phase + "Photo"] ? [{ key: choreId + ":" + phase, legacy: true }] : [];
+}
+
+function recordHasPhoto(record, phase) {
+  return Boolean(record && (record[phase + "Photo"] || Array.isArray(record[phase + "Photos"]) && record[phase + "Photos"].length));
+}
+
+async function loadPhaseEvidence(choreId, record, phase) {
+  const metadata = phasePhotoMetadata(record, phase, choreId);
+  const evidence = await Promise.all(metadata.map(async (photo) => ({ photo, blob: await getEvidence(photo.key) })));
+  return evidence.filter((item) => item.blob);
+}
+
+async function clearPhaseEvidence(choreId, record, phase) {
+  const keys = new Set(phasePhotoMetadata(record, phase, choreId).map((photo) => photo.key));
+  keys.add(choreId + ":" + phase);
+  await Promise.allSettled(Array.from(keys).map(deleteEvidence));
+  record[phase + "Photos"] = [];
+  record[phase + "Photo"] = false;
+}
+
 function openPhotoDialog(item) {
   state.activeChore = item;
-  state.selectedPhotoFile = null;
+  clearSelectedPhotoFiles();
   const finishing = item.dataset.state === "in-progress";
   const name = $(".chore-copy strong", item).textContent;
-  $("#photoTitle").textContent = (finishing ? "Add an after" : "Add a before") + " photo";
-  $("#photoHelp").textContent = finishing ? "Show the finished result for “" + name + ".” Points stay pending until an adult reviews both photos." : "Take a quick picture before starting “" + name + ".” An adult will compare it with the finished result.";
+  $("#photoTitle").textContent = (finishing ? "Add after" : "Add before") + " photos";
+  $("#photoHelp").textContent = finishing ? "Show the finished result for “" + name + ".” Add up to six views. Points stay pending until an adult reviews the before and after photos." : "Show the starting condition for “" + name + ".” Add up to six views so an adult can make a fair comparison.";
   $("#chorePhoto").value = "";
-  $("#photoPreview").removeAttribute("src");
-  $("#photoDrop").classList.remove("has-image");
-  $("#savePhotoButton").disabled = true;
-  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
-  state.photoUrl = null;
+  renderSelectedPhotoFiles();
   elements.photoDialog.showModal();
 }
 
 async function completePhotoStep(withPhoto) {
   const item = state.activeChore;
-  if (!item) return;
+  if (!item) return false;
+  if (withPhoto && !state.selectedPhotoFiles.length) return false;
   const id = item.dataset.choreId;
   const wasFinishing = item.dataset.state === "in-progress";
-  const record = state.chores[id] || {};
-  record.occurrenceDate = datePlus(0);
+  const currentRecord = state.chores[id] || {};
+  const record = { ...currentRecord };
+  if (Array.isArray(currentRecord.beforePhotos)) record.beforePhotos = currentRecord.beforePhotos.map((photo) => ({ ...photo }));
+  if (Array.isArray(currentRecord.afterPhotos)) record.afterPhotos = currentRecord.afterPhotos.map((photo) => ({ ...photo }));
   const phase = wasFinishing ? "after" : "before";
-  if (withPhoto && state.selectedPhotoFile) {
-    await saveEvidence(id + ":" + phase, state.selectedPhotoFile);
-    record[phase + "Photo"] = true;
-  } else {
-    record[phase + "Photo"] = false;
+  const savedKeys = [];
+  const button = $("#savePhotoButton");
+  button.disabled = true;
+  button.textContent = "Saving...";
+  try {
+    const metadata = [];
+    if (withPhoto) {
+      for (const selected of state.selectedPhotoFiles) {
+        const blob = await optimizeEvidencePhoto(selected.file);
+        const key = id + ":" + phase + ":" + makeId("photo");
+        await saveEvidence(key, blob);
+        savedKeys.push(key);
+        metadata.push({
+          key,
+          name: selected.file.name || phase + " photo",
+          type: blob.type || selected.file.type || "image/jpeg",
+          size: blob.size || selected.file.size || 0,
+          takenAt: selected.takenAt,
+          dateSource: selected.dateSource,
+          addedAt: new Date().toISOString(),
+        });
+      }
+    }
+    if (!wasFinishing) {
+      await clearPhaseEvidence(id, record, "before");
+      await clearPhaseEvidence(id, record, "after");
+      await deleteEvidence(id + ":feedback");
+      record.reviewReason = "";
+      record.returnedBy = "";
+      record.returnedAt = null;
+      record.reviewMarkup = false;
+      record.approvedBy = "";
+      record.approvedAt = null;
+    } else {
+      await clearPhaseEvidence(id, record, phase);
+    }
+    record[phase + "Photos"] = metadata;
+    record[phase + "Photo"] = metadata.length > 0;
+    record.occurrenceDate = datePlus(0);
+    if (wasFinishing) {
+      record.status = "pending";
+      record.submittedAt = new Date().toISOString();
+      record.pointsAwarded = false;
+      record.reviewReason = "";
+      record.returnedBy = "";
+      record.returnedAt = null;
+      record.reviewMarkup = false;
+      await deleteEvidence(id + ":feedback");
+      showToast("Submitted for adult approval. Points are pending.");
+    } else {
+      record.status = "in-progress";
+      showToast(metadata.length === 1 ? "Before photo saved. Add after photos when the chore is finished." : "Before photos saved. Add after photos when the chore is finished.");
+    }
+    state.chores[id] = record;
+    persistChores();
+    const chore = choreById(id);
+    if (chore) logActivity((wasFinishing ? "Submitted " : "Started ") + "chore “" + chore.title + "”" + (metadata.length ? " with " + metadata.length + (metadata.length === 1 ? " photo" : " photos") : ""), "📷", "chores");
+    state.activeChore = null;
+    clearSelectedPhotoFiles();
+    renderAll();
+    return true;
+  } catch {
+    await Promise.all(savedKeys.map(deleteEvidence));
+    renderSelectedPhotoFiles();
+    showToast("The photos could not be saved. Please try again.");
+    return false;
   }
-  if (wasFinishing) {
-    record.status = "pending";
-    record.submittedAt = new Date().toISOString();
-    record.pointsAwarded = false;
-    record.reviewReason = "";
-    record.returnedBy = "";
-    record.returnedAt = null;
-    record.reviewMarkup = false;
-    await deleteEvidence(id + ":feedback");
-    showToast("Submitted for adult approval. Points are pending.");
-  } else {
-    record.status = "in-progress";
-    showToast("Before photo saved. Add an after photo when the chore is finished.");
-  }
-  state.chores[id] = record;
-  persistChores();
-  const chore = choreById(id);
-  if (chore) logActivity((wasFinishing ? "Submitted " : "Started ") + "chore “" + chore.title + "”" + (withPhoto ? " with a photo" : ""), "📷", "chores");
-  state.activeChore = null;
-  state.selectedPhotoFile = null;
-  renderAll();
 }
 
-function displayEvidence(img, empty, blob) {
-  const frame = img.closest("button");
-  if (blob) {
-    const url = URL.createObjectURL(blob);
+function renderEvidenceList(container, empty, evidence, phase) {
+  container.innerHTML = "";
+  empty.hidden = evidence.length > 0;
+  evidence.forEach((item, index) => {
+    const url = URL.createObjectURL(item.blob);
     state.detailUrls.push(url);
-    img.src = url;
-    img.classList.add("visible");
-    empty.hidden = true;
-    if (frame) frame.disabled = false;
-  } else {
-    img.removeAttribute("src");
-    img.classList.remove("visible");
-    empty.hidden = false;
-    if (frame) frame.disabled = true;
-  }
+    const button = document.createElement("button");
+    button.className = "evidence-frame";
+    button.type = "button";
+    button.dataset.evidenceUrl = url;
+    button.dataset.evidenceCaption = (phase === "before" ? "Before" : "After") + " photo " + (index + 1) + " of " + evidence.length + " · " + photoDateLabel(item.photo);
+    button.innerHTML = '<img src="' + url + '" alt="' + (phase === "before" ? "Before" : "After") + ' chore photo ' + (index + 1) + '"><span>' + escapeHtml(photoDateLabel(item.photo)) + "</span>";
+    container.appendChild(button);
+  });
 }
 
 function openEvidenceViewer(source, caption) {
@@ -2472,18 +2685,18 @@ async function openChoreDetail(choreId) {
   $("#approvalRecord").innerHTML = record.approvedBy ? "<strong>Checked by " + escapeHtml(record.approvedBy) + "</strong><br>" + new Date(record.approvedAt).toLocaleString() : status === "pending" ? evidenceRequired ? "Both photos must be present before points can be approved." : "This chore does not require photo evidence, but an adult still confirms completion." : "No adult verification record is available for this completed chore.";
   const canReview = status === "pending" && canReviewFromCurrentView();
   $("#detailActions").hidden = !canReview;
-  const evidenceReady = !evidenceRequired || record.beforePhoto && record.afterPhoto;
+  const evidenceReady = !evidenceRequired || recordHasPhoto(record, "before") && recordHasPhoto(record, "after");
   $("#approveChoreButton").disabled = !evidenceReady;
-  $("#approveChoreButton").textContent = evidenceReady ? PROFILES[state.profile].adult ? "Approve as " + PROFILES[state.profile].name : "Verify adult & approve" : "Both photos required";
+  $("#approveChoreButton").textContent = evidenceReady ? PROFILES[state.profile].adult ? "Approve as " + PROFILES[state.profile].name : "Verify adult & approve" : "Before and after photos required";
   $("#choreReviewFeedback").hidden = !returned;
   $("#reviewFeedbackReason").textContent = returned ? record.reviewReason : "";
   $("#reviewFeedbackTitle").textContent = returned ? "Returned by " + (record.returnedBy || "an adult") : "Returned for another try";
   $("#reviewFeedbackImageButton").hidden = true;
   elements.choreDetailDialog.showModal();
   try {
-    const evidence = await Promise.all([getEvidence(choreId + ":before"), getEvidence(choreId + ":after"), returned && record.reviewMarkup ? getEvidence(choreId + ":feedback") : null]);
-    displayEvidence($("#beforeEvidence"), $("#beforeEmpty"), evidence[0]);
-    displayEvidence($("#afterEvidence"), $("#afterEmpty"), evidence[1]);
+    const evidence = await Promise.all([loadPhaseEvidence(choreId, record, "before"), loadPhaseEvidence(choreId, record, "after"), returned && record.reviewMarkup ? getEvidence(choreId + ":feedback") : null]);
+    renderEvidenceList($("#beforeEvidenceList"), $("#beforeEmpty"), evidence[0], "before");
+    renderEvidenceList($("#afterEvidenceList"), $("#afterEmpty"), evidence[1], "after");
     if (evidence[2]) {
       const feedbackUrl = URL.createObjectURL(evidence[2]);
       state.detailUrls.push(feedbackUrl);
@@ -2673,8 +2886,8 @@ async function approveChore(parentId) {
   if (!chore) return;
   const record = state.chores[chore.id] || {};
   const evidenceRequired = chore.photoRequired !== false || chore.points > 0;
-  if (record.status !== "pending" || evidenceRequired && (!record.beforePhoto || !record.afterPhoto)) {
-    showToast("Both photos are required before approval");
+  if (record.status !== "pending" || evidenceRequired && (!recordHasPhoto(record, "before") || !recordHasPhoto(record, "after"))) {
+    showToast("Before and after photos are required before approval");
     return;
   }
   record.status = "done";
@@ -2711,9 +2924,25 @@ function redrawReviewBase() {
 async function openRedoEditor(parentId) {
   const chore = choreById(state.detailChoreId);
   if (!chore) return;
-  const afterPhoto = await getEvidence(chore.id + ":after");
-  if (!afterPhoto) return showToast("An after photo is needed before feedback can be marked up");
-  const imageUrl = URL.createObjectURL(afterPhoto);
+  const record = state.chores[chore.id] || {};
+  state.reviewEvidenceItems = await loadPhaseEvidence(chore.id, record, "after");
+  if (!state.reviewEvidenceItems.length) return showToast("An after photo is needed before feedback can be marked up");
+  const picker = $("#reviewPhotoInput");
+  picker.innerHTML = state.reviewEvidenceItems.map((item, index) => '<option value="' + index + '">After photo ' + (index + 1) + " · " + escapeHtml(photoDateLabel(item.photo)) + "</option>").join("");
+  $("#reviewPhotoField").hidden = state.reviewEvidenceItems.length < 2;
+  state.reviewParentId = parentId;
+  state.reviewColor = "#ef3f37";
+  state.reviewDrawing = false;
+  $("#redoReasonInput").value = "";
+  $$('[data-review-color]').forEach((button) => button.classList.toggle("active", button.dataset.reviewColor === state.reviewColor));
+  if (!await loadReviewPhoto(0)) return;
+  elements.redoDialog.showModal();
+}
+
+async function loadReviewPhoto(index) {
+  const selected = state.reviewEvidenceItems[Number(index) || 0];
+  if (!selected) return false;
+  const imageUrl = URL.createObjectURL(selected.blob);
   const image = new Image();
   try {
     await new Promise((resolve, reject) => {
@@ -2723,22 +2952,22 @@ async function openRedoEditor(parentId) {
     });
   } catch {
     URL.revokeObjectURL(imageUrl);
-    return showToast("The after photo could not be opened for markup");
+    $("#reviewPhotoInput").value = String(state.reviewPhotoIndex);
+    showToast("This photo format cannot be opened for markup on this device");
+    return false;
   }
   const maxSide = 1600;
   const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
   const canvas = $("#reviewMarkupCanvas");
   canvas.width = Math.max(320, Math.round(image.naturalWidth * scale));
   canvas.height = Math.max(240, Math.round(image.naturalHeight * scale));
-  state.reviewParentId = parentId;
+  if (state.reviewImageUrl) URL.revokeObjectURL(state.reviewImageUrl);
+  state.reviewPhotoIndex = Number(index) || 0;
   state.reviewBaseImage = image;
   state.reviewImageUrl = imageUrl;
-  state.reviewColor = "#ef3f37";
   state.reviewDrawing = false;
-  $("#redoReasonInput").value = "";
-  $$('[data-review-color]').forEach((button) => button.classList.toggle("active", button.dataset.reviewColor === state.reviewColor));
   redrawReviewBase();
-  elements.redoDialog.showModal();
+  return true;
 }
 
 async function requestNewPhotos(parentId) {
@@ -2760,17 +2989,18 @@ async function submitRedoFeedback() {
     const markup = await new Promise((resolve) => $("#reviewMarkupCanvas").toBlob(resolve, "image/jpeg", .9));
     if (markup) await saveEvidence(chore.id + ":feedback", markup);
     record.reviewMarkup = Boolean(markup);
+    record.reviewMarkupPhotoNumber = state.reviewPhotoIndex + 1;
   } else {
     await deleteEvidence(chore.id + ":feedback");
     record.reviewMarkup = false;
+    record.reviewMarkupPhotoNumber = null;
   }
   record.status = "in-progress";
-  record.afterPhoto = false;
   record.returnedBy = PROFILES[parentId].name;
   record.returnedAt = new Date().toISOString();
   record.reviewReason = reason;
   state.chores[chore.id] = record;
-  await deleteEvidence(chore.id + ":after");
+  await clearPhaseEvidence(chore.id, record, "after");
   persistChores();
   logActivity(PROFILES[parentId].name + " returned “" + chore.title + "” with written feedback" + (record.reviewMarkup ? " and photo markup" : ""), "↩", "chores");
   elements.redoDialog.close();
@@ -2778,6 +3008,7 @@ async function submitRedoFeedback() {
   if (state.reviewImageUrl) URL.revokeObjectURL(state.reviewImageUrl);
   state.reviewImageUrl = null;
   state.reviewBaseImage = null;
+  state.reviewEvidenceItems = [];
   state.reviewParentId = null;
   renderAll();
   showToast("Feedback sent · a new after photo was requested");
@@ -2786,6 +3017,7 @@ async function submitRedoFeedback() {
 async function removeChore(choreId, parentId) {
   const chore = choreById(choreId);
   if (!chore) return;
+  const record = state.chores[choreId] || {};
   if (state.customChores.some((item) => item.id === choreId)) {
     state.customChores = state.customChores.filter((item) => item.id !== choreId);
     persistCustomChores();
@@ -2795,7 +3027,7 @@ async function removeChore(choreId, parentId) {
   }
   delete state.chores[choreId];
   persistChores();
-  await Promise.all([deleteEvidence(choreId + ":before"), deleteEvidence(choreId + ":after"), deleteEvidence(choreId + ":feedback")]);
+  await Promise.all([clearPhaseEvidence(choreId, record, "before"), clearPhaseEvidence(choreId, record, "after"), deleteEvidence(choreId + ":feedback")]);
   logActivity(PROFILES[parentId].name + " removed chore “" + chore.title + "”", "×");
   renderAll();
   showToast(chore.title + " removed by " + PROFILES[parentId].name);
@@ -3213,14 +3445,15 @@ function calmArtSlide(piece) {
 async function calmBeforeAfterSlides() {
   const eligible = allChores().filter((chore) => {
     const record = state.chores[chore.id] || {};
-    return record.beforePhoto && record.afterPhoto;
+    return recordHasPhoto(record, "before") && recordHasPhoto(record, "after");
   }).sort((a, b) => String((state.chores[b.id] || {}).approvedAt || "").localeCompare(String((state.chores[a.id] || {}).approvedAt || ""))).slice(0, 8);
   const slides = [];
   for (const chore of eligible) {
-    const blobs = await Promise.all([getEvidence(chore.id + ":before"), getEvidence(chore.id + ":after")]);
-    if (!blobs[0] || !blobs[1]) continue;
-    const beforeUrl = URL.createObjectURL(blobs[0]);
-    const afterUrl = URL.createObjectURL(blobs[1]);
+    const record = state.chores[chore.id] || {};
+    const evidence = await Promise.all([loadPhaseEvidence(chore.id, record, "before"), loadPhaseEvidence(chore.id, record, "after")]);
+    if (!evidence[0].length || !evidence[1].length) continue;
+    const beforeUrl = URL.createObjectURL(evidence[0][0].blob);
+    const afterUrl = URL.createObjectURL(evidence[1][evidence[1].length - 1].blob);
     calmObjectUrls.push(beforeUrl, afterUrl);
     slides.push('<span class="calm-slide calm-before-after"><span><img src="' + beforeUrl + '" alt=""><b>Before</b></span><span><img src="' + afterUrl + '" alt=""><b>After</b></span><span class="calm-caption">' + escapeHtml(profileName(chore.person) + " · " + chore.title) + "</span></span>");
   }
@@ -3640,33 +3873,36 @@ $(".filter-row").addEventListener("click", (event) => {
   renderFullChores();
 });
 
-$("#chorePhoto").addEventListener("change", (event) => {
-  const file = event.target.files && event.target.files[0];
-  if (!file) return;
-  state.selectedPhotoFile = file;
-  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
-  state.photoUrl = URL.createObjectURL(file);
-  $("#photoPreview").src = state.photoUrl;
-  $("#photoDrop").classList.add("has-image");
-  $("#savePhotoButton").disabled = false;
+$("#chorePhoto").addEventListener("change", async (event) => {
+  await addSelectedPhotoFiles(event.target.files);
+  event.target.value = "";
+});
+
+$("#photoPreviewGrid").addEventListener("click", (event) => {
+  const remove = event.target.closest("[data-remove-selected-photo]");
+  if (!remove) return;
+  const index = Number(remove.dataset.removeSelectedPhoto);
+  const selected = state.selectedPhotoFiles[index];
+  if (selected) URL.revokeObjectURL(selected.previewUrl);
+  state.selectedPhotoFiles.splice(index, 1);
+  renderSelectedPhotoFiles();
 });
 
 $("#photoForm").addEventListener("submit", async (event) => {
   const value = event.submitter && event.submitter.value;
   if (!["save", "skip"].includes(value)) return;
   event.preventDefault();
-  await completePhotoStep(value === "save");
-  elements.photoDialog.close();
+  if (await completePhotoStep(value === "save")) elements.photoDialog.close();
+});
+elements.photoDialog.addEventListener("close", () => {
+  clearSelectedPhotoFiles();
+  state.activeChore = null;
 });
 
 $("#closeChoreDetail").addEventListener("click", () => elements.choreDetailDialog.close());
 $("#choreDetailDialog").addEventListener("click", (event) => {
-  const evidenceButton = event.target.closest("[data-view-evidence]");
-  if (evidenceButton && !evidenceButton.disabled) {
-    const phase = evidenceButton.dataset.viewEvidence;
-    const image = phase === "before" ? $("#beforeEvidence") : $("#afterEvidence");
-    openEvidenceViewer(image.src, (phase === "before" ? "Before" : "After") + " · " + $("#detailTitle").textContent);
-  }
+  const evidenceButton = event.target.closest("[data-evidence-url]");
+  if (evidenceButton) openEvidenceViewer(evidenceButton.dataset.evidenceUrl, evidenceButton.dataset.evidenceCaption + " · " + $("#detailTitle").textContent);
 });
 $("#reviewFeedbackImageButton").addEventListener("click", () => openEvidenceViewer($("#reviewFeedbackImage").src, "Adult feedback · " + $("#detailTitle").textContent));
 $("#closeEvidenceViewer").addEventListener("click", () => elements.evidenceViewerDialog.close());
@@ -3713,11 +3949,16 @@ const finishReviewStroke = () => { state.reviewDrawing = false; state.reviewLast
 $("#reviewMarkupCanvas").addEventListener("pointerup", finishReviewStroke);
 $("#reviewMarkupCanvas").addEventListener("pointercancel", finishReviewStroke);
 $("#clearReviewMarkup").addEventListener("click", redrawReviewBase);
+$("#reviewPhotoInput").addEventListener("change", async (event) => {
+  await loadReviewPhoto(event.target.value);
+});
 function closeRedoEditor() {
   if (elements.redoDialog.open) elements.redoDialog.close();
   if (state.reviewImageUrl) URL.revokeObjectURL(state.reviewImageUrl);
   state.reviewImageUrl = null;
   state.reviewBaseImage = null;
+  state.reviewEvidenceItems = [];
+  state.reviewPhotoIndex = 0;
   state.reviewParentId = null;
 }
 elements.redoDialog.addEventListener("cancel", (event) => {

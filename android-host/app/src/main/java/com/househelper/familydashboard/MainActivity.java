@@ -4,9 +4,9 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -28,11 +28,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
+import java.io.File;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public final class MainActivity extends Activity {
     private static final int REQUEST_FILE_CHOOSER = 7101;
@@ -44,6 +50,7 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> fileChooserCallback;
     private Uri pendingCameraUri;
+    private File pendingCameraFile;
     private byte[] pendingDownloadBytes;
     private String pendingDownloadMime = "application/json";
     private boolean loaded;
@@ -54,6 +61,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        pruneCameraCache();
         configureWebView();
         startHostService();
         requestNotificationPermission();
@@ -76,6 +84,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        deletePendingCameraImage();
         if (pendingGeolocationCallback != null) {
             pendingGeolocationCallback.invoke(pendingGeolocationOrigin, false, false);
             pendingGeolocationCallback = null;
@@ -203,13 +212,15 @@ public final class MainActivity extends Activity {
                 if (type == null || type.isEmpty() || type.startsWith("image/") || "*/*".equals(type)) acceptsImages = true;
             }
         }
-        if (!acceptsImages || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (!acceptsImages) {
+            if (params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
             return Intent.createChooser(picker, "Choose a file");
         }
 
+        picker.setType("image/*");
+        if (params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         Intent camera = createCameraIntent();
         if (camera == null) return Intent.createChooser(picker, "Choose a file");
-        if (params.isCaptureEnabled()) return camera;
         Intent chooser = Intent.createChooser(picker, "Choose or take a photo");
         chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camera});
         return chooser;
@@ -217,12 +228,11 @@ public final class MainActivity extends Activity {
 
     private Intent createCameraIntent() {
         try {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Images.Media.DISPLAY_NAME, "HouseHelper-" + System.currentTimeMillis() + ".jpg");
-            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) values.put(MediaStore.Images.Media.IS_PENDING, 1);
-            pendingCameraUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-            if (pendingCameraUri == null) return null;
+            deletePendingCameraImage();
+            File cameraDirectory = new File(getCacheDir(), "camera");
+            if (!cameraDirectory.exists() && !cameraDirectory.mkdirs()) return null;
+            pendingCameraFile = File.createTempFile("HouseHelper-", ".jpg", cameraDirectory);
+            pendingCameraUri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".fileprovider", pendingCameraFile);
             Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             camera.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
             camera.setClipData(ClipData.newRawUri("HouseHelper photo", pendingCameraUri));
@@ -231,6 +241,10 @@ public final class MainActivity extends Activity {
                 deletePendingCameraImage();
                 return null;
             }
+            List<ResolveInfo> handlers = getPackageManager().queryIntentActivities(camera, PackageManager.MATCH_DEFAULT_ONLY);
+            for (ResolveInfo handler : handlers) {
+                grantUriPermission(handler.activityInfo.packageName, pendingCameraUri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            }
             return camera;
         } catch (Exception error) {
             deletePendingCameraImage();
@@ -238,23 +252,59 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void finishCameraImage() {
-        if (pendingCameraUri == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.Images.Media.IS_PENDING, 0);
+    private void releaseCameraGrant() {
+        if (pendingCameraUri == null) return;
         try {
-            getContentResolver().update(pendingCameraUri, values, null, null);
+            revokeUriPermission(pendingCameraUri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         } catch (Exception ignored) {
         }
     }
 
     private void deletePendingCameraImage() {
-        if (pendingCameraUri == null) return;
-        try {
-            getContentResolver().delete(pendingCameraUri, null, null);
-        } catch (Exception ignored) {
-        }
+        releaseCameraGrant();
+        if (pendingCameraFile != null && pendingCameraFile.exists()) pendingCameraFile.delete();
         pendingCameraUri = null;
+        pendingCameraFile = null;
+    }
+
+    private void pruneCameraCache() {
+        File directory = new File(getCacheDir(), "camera");
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        long cutoff = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+        for (File file : files) {
+            if (file.isFile() && file.lastModified() < cutoff) file.delete();
+        }
+    }
+
+    private Uri[] selectedFileUris(Intent data) {
+        if (data == null) return null;
+        Set<Uri> selected = new LinkedHashSet<>();
+        ClipData clipData = data.getClipData();
+        if (clipData != null) {
+            for (int index = 0; index < clipData.getItemCount(); index += 1) {
+                Uri uri = clipData.getItemAt(index).getUri();
+                if (uri != null && "content".equalsIgnoreCase(uri.getScheme())) selected.add(uri);
+            }
+        }
+        Uri single = data.getData();
+        if (single != null && "content".equalsIgnoreCase(single.getScheme())) selected.add(single);
+        if (selected.isEmpty()) {
+            Uri[] parsed = WebChromeClient.FileChooserParams.parseResult(RESULT_OK, data);
+            if (parsed != null) for (Uri uri : parsed) if (uri != null && "content".equalsIgnoreCase(uri.getScheme())) selected.add(uri);
+        }
+        return selected.isEmpty() ? null : selected.toArray(new Uri[0]);
+    }
+
+    private boolean resultContainsPendingCamera(Intent data) {
+        if (data == null || pendingCameraUri == null) return false;
+        if (pendingCameraUri.equals(data.getData())) return true;
+        ClipData clipData = data.getClipData();
+        if (clipData == null) return false;
+        for (int index = 0; index < clipData.getItemCount(); index += 1) {
+            if (pendingCameraUri.equals(clipData.getItemAt(index).getUri())) return true;
+        }
+        return false;
     }
 
     private void beginSave(String content, String filename, String mimeType) {
@@ -293,14 +343,21 @@ public final class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_FILE_CHOOSER) {
-            if (fileChooserCallback == null) return;
+            if (fileChooserCallback == null) {
+                deletePendingCameraImage();
+                return;
+            }
             Uri[] result = null;
-            if (resultCode == RESULT_OK && pendingCameraUri != null && (data == null || data.getData() == null)) {
-                finishCameraImage();
+            boolean pickerReturnedFiles = data != null && (data.getData() != null || data.getClipData() != null);
+            boolean cameraFileReady = pendingCameraFile != null && pendingCameraFile.isFile() && pendingCameraFile.length() > 0;
+            boolean cameraReturned = pendingCameraUri != null && cameraFileReady && (!pickerReturnedFiles || resultContainsPendingCamera(data));
+            if (resultCode == RESULT_OK && cameraReturned) {
                 result = new Uri[]{pendingCameraUri};
+                releaseCameraGrant();
                 pendingCameraUri = null;
+                pendingCameraFile = null;
             } else if (resultCode == RESULT_OK) {
-                result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                result = selectedFileUris(data);
                 deletePendingCameraImage();
             } else {
                 deletePendingCameraImage();

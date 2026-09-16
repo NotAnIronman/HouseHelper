@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=0.6.0" />
+    <link rel="stylesheet" href="./styles.css?v=0.6.1" />
     <title>HouseHelper</title>
   </head>
   <body>
@@ -312,7 +312,7 @@
           <label class="passcode-field"><span>4-digit passcode</span><input id="passcodeInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done" aria-describedby="passcodeHelp passcodeError" /></label>
           <p class="passcode-error" id="passcodeError" role="alert"></p>
           <p class="security-note">Passcodes protect adult actions across connected family devices. Passcodes are stored as one-way hashes, never as readable numbers.</p>
-          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.0</p>
+          <p class="build-stamp" id="passcodeBuildLabel">HouseHelper 0.6.1</p>
         </div>
         <div class="dialog-footer"><button class="secondary-button" id="cancelPasscodeButton" type="button">Cancel</button><button class="primary-button" id="unlockButton" type="button">Continue</button></div>
       </form>
@@ -324,8 +324,8 @@
         <div class="dialog-body">
           <div class="detail-status" id="detailStatus"></div>
           <div class="evidence-grid">
-            <figure><figcaption>Before photo. Tap to enlarge.</figcaption><button class="evidence-frame" data-view-evidence="before" type="button"><img id="beforeEvidence" alt="Before chore photo" /><span id="beforeEmpty">No photo posted</span></button></figure>
-            <figure><figcaption>After photo. Tap to enlarge.</figcaption><button class="evidence-frame" data-view-evidence="after" type="button"><img id="afterEvidence" alt="After chore photo" /><span id="afterEmpty">No photo posted</span></button></figure>
+            <figure><figcaption>Before photos. Tap any photo to enlarge.</figcaption><div class="evidence-photo-list" id="beforeEvidenceList"></div><span class="evidence-empty" id="beforeEmpty">No photos posted</span></figure>
+            <figure><figcaption>After photos. Tap any photo to enlarge.</figcaption><div class="evidence-photo-list" id="afterEvidenceList"></div><span class="evidence-empty" id="afterEmpty">No photos posted</span></figure>
           </div>
           <div class="chore-review-feedback" id="choreReviewFeedback" hidden><div><span>↩</span><div><strong id="reviewFeedbackTitle">Returned for another try</strong><p id="reviewFeedbackReason"></p></div></div><button class="feedback-image-frame" id="reviewFeedbackImageButton" type="button" hidden><img id="reviewFeedbackImage" alt="Adult markup showing what needs attention" /><span>Tap to view adult markup</span></button></div>
           <div class="approval-record" id="approvalRecord"></div>
@@ -533,7 +533,7 @@
         <div class="dialog-body">
           <div class="device-host-status" id="deviceHostStatus"><span class="device-status-dot"></span><div><strong id="deviceHostTitle">Standalone on this device</strong><small id="deviceHostCopy">This browser is using its own private copy of the household data.</small></div></div>
           <div class="device-name-editor"><label class="field"><span>This device’s name</span><input id="connectedDeviceName" maxlength="50" autocomplete="off" enterkeyhint="done" placeholder="Kitchen tablet" /></label><button class="secondary-dark-button" id="saveDeviceNameButton" type="button">Save name</button></div>
-          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.0</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
+          <div class="device-meta-grid" aria-label="Connection details"><div><span>App build</span><strong id="deviceBuildLabel">0.6.1</strong></div><div><span>Device role</span><strong id="deviceRoleLabel">Standalone</strong></div><div><span>Last sync</span><strong id="deviceSyncLabel">Not connected</strong></div></div>
           <div class="pairing-card" id="pairingCard" hidden><canvas class="pairing-qr" id="pairingQrCode" width="260" height="260" aria-label="QR code containing the household pairing address"></canvas><div><span>Pairing address</span><strong id="pairingAddress"></strong><p>Scan the code or open this address in Safari or Chrome on a device connected to the same home Wi-Fi.</p><button class="secondary-dark-button" id="copyPairingAddressButton" type="button">Copy pairing address</button></div></div>
           <div class="connected-device-list" id="connectedDeviceList"></div>
           <p class="device-help" id="deviceConnectionHelp">The website cannot become a Wi-Fi host by itself. The kitchen tablet’s Android app runs the household service.</p>
@@ -571,7 +571,7 @@
     </dialog>
 
     <dialog id="redoDialog" class="app-dialog review-markup-dialog">
-      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Chore feedback</p><h2>Request another try</h2></div><button class="close-button" id="closeRedoDialog" type="button" aria-label="Close feedback editor">×</button></div><div class="dialog-body"><p class="review-markup-help">Circle or underline anything that needs attention. Thin marks are saved over a copy of the submitted after photo.</p><div class="review-canvas-wrap"><canvas id="reviewMarkupCanvas" width="1200" height="800" aria-label="Draw feedback over the submitted chore photo"></canvas></div><div class="review-markup-tools"><span>Markup color</span><button class="active" data-review-color="#ef3f37" style="--review-color:#ef3f37" type="button" aria-label="Red markup"></button><button data-review-color="#ffcc33" style="--review-color:#ffcc33" type="button" aria-label="Yellow markup"></button><button data-review-color="#1677ff" style="--review-color:#1677ff" type="button" aria-label="Blue markup"></button><button class="secondary-dark-button" id="clearReviewMarkup" type="button">Clear marks</button></div><label class="field"><span>What needs another try?</span><textarea id="redoReasonInput" maxlength="300" rows="3" placeholder="Example: Please wipe the lower-left corner and dry the faucet." required></textarea></label></div><div class="dialog-footer"><button class="secondary-button" id="cancelRedoButton" type="button">Cancel</button><button class="primary-button" id="sendRedoButton" type="button">Send feedback</button></div></div>
+      <div class="dialog-panel"><div class="dialog-header"><div><p class="eyebrow">Chore feedback</p><h2>Request another try</h2></div><button class="close-button" id="closeRedoDialog" type="button" aria-label="Close feedback editor">×</button></div><div class="dialog-body"><p class="review-markup-help">Circle or underline anything that needs attention. Thin marks are saved over a copy of the selected after photo.</p><label class="field" id="reviewPhotoField" hidden><span>Photo to mark up</span><select id="reviewPhotoInput"></select></label><div class="review-canvas-wrap"><canvas id="reviewMarkupCanvas" width="1200" height="800" aria-label="Draw feedback over the submitted chore photo"></canvas></div><div class="review-markup-tools"><span>Markup color</span><button class="active" data-review-color="#ef3f37" style="--review-color:#ef3f37" type="button" aria-label="Red markup"></button><button data-review-color="#ffcc33" style="--review-color:#ffcc33" type="button" aria-label="Yellow markup"></button><button data-review-color="#1677ff" style="--review-color:#1677ff" type="button" aria-label="Blue markup"></button><button class="secondary-dark-button" id="clearReviewMarkup" type="button">Clear marks</button></div><label class="field"><span>What needs another try?</span><textarea id="redoReasonInput" maxlength="300" rows="3" placeholder="Example: Please wipe the lower-left corner and dry the faucet." required></textarea></label></div><div class="dialog-footer"><button class="secondary-button" id="cancelRedoButton" type="button">Cancel</button><button class="primary-button" id="sendRedoButton" type="button">Send feedback</button></div></div>
     </dialog>
 
     <dialog id="listIdentityDialog" class="app-dialog identity-dialog">
@@ -595,21 +595,23 @@
         <div class="dialog-header"><div><p class="eyebrow" id="photoEyebrow">Chore proof</p><h2 id="photoTitle">Add a before photo</h2></div><button class="close-button" value="cancel" aria-label="Close" type="submit">×</button></div>
         <div class="dialog-body">
           <p class="photo-help" id="photoHelp">Take a picture before you begin so it can be compared with the finished chore.</p>
-          <label class="photo-drop" id="photoDrop"><input id="chorePhoto" type="file" accept="image/*" capture="environment" /><span class="camera-circle"><svg><use href="#icon-camera"></use></svg></span><strong>Take or choose a photo</strong><span>JPG, PNG, or HEIC</span><img id="photoPreview" alt="Selected chore photo preview" /></label>
+          <label class="photo-drop" id="photoDrop"><input id="chorePhoto" type="file" accept="image/*" multiple /><span class="camera-circle"><svg><use href="#icon-camera"></use></svg></span><strong>Take or choose photos</strong><span>Up to 6 JPG, PNG, WEBP, or HEIC files</span></label>
+          <div class="photo-preview-grid" id="photoPreviewGrid" aria-live="polite"></div>
+          <p class="photo-selection-summary" id="photoSelectionSummary">No photos selected yet.</p>
         </div>
-        <div class="dialog-footer"><button class="text-button" id="skipPhotoButton" value="skip" type="submit">Skip for now</button><button class="primary-button" id="savePhotoButton" value="save" type="submit" disabled>Save photo</button></div>
+        <div class="dialog-footer"><button class="text-button" id="skipPhotoButton" value="skip" type="submit">Skip for now</button><button class="primary-button" id="savePhotoButton" value="save" type="submit" disabled>Save photos</button></div>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-icon"><svg><use href="#icon-check"></use></svg></span><span id="toastText"></span></div>
-    <script src="./compat.js?v=0.6.0" defer></script>
-    <script src="./qr.js?v=0.6.0" defer></script>
-    <script src="./languages.js?v=0.6.0" defer></script>
-    <script src="./language-german-b1.js?v=0.6.0" defer></script>
-    <script src="./language-korean-b1.js?v=0.6.0" defer></script>
-    <script src="./language-world.js?v=0.6.0" defer></script>
-    <script src="./language-more.js?v=0.6.0" defer></script>
-    <script src="./app.js?v=0.6.0" defer></script>
-    <script src="./sync.js?v=0.6.0" defer></script>
+    <script src="./compat.js?v=0.6.1" defer></script>
+    <script src="./qr.js?v=0.6.1" defer></script>
+    <script src="./languages.js?v=0.6.1" defer></script>
+    <script src="./language-german-b1.js?v=0.6.1" defer></script>
+    <script src="./language-korean-b1.js?v=0.6.1" defer></script>
+    <script src="./language-world.js?v=0.6.1" defer></script>
+    <script src="./language-more.js?v=0.6.1" defer></script>
+    <script src="./app.js?v=0.6.1" defer></script>
+    <script src="./sync.js?v=0.6.1" defer></script>
   </body>
 </html>

@@ -16,7 +16,7 @@ await import(new URL("../dist/language-more.js", import.meta.url));
 const compat = globalThis.HouseHelperCompat;
 const languagePacks = globalThis.HouseHelperLanguagePacks.packs;
 
-assert.equal(compat.VERSION, "0.6.0");
+assert.equal(compat.VERSION, "0.6.1");
 assert.ok(languagePacks.every((pack) => pack.cefrMax === "B1" && pack.modules.some((module) => module.level === "B1")), "every course must ship with a B1-preparation path");
 assert.deepEqual(languagePacks.map((pack) => pack.id), ["german", "korean", "spanish", "french", "japanese", "italian", "mandarin"], "the complete offline course catalog must load in a stable order");
 const languageCards = languagePacks.flatMap((pack) => pack.modules.flatMap((module) => module.cards));
@@ -48,6 +48,7 @@ const worker = await readFile(join(root, "dist", "service-worker.js"), "utf8");
 const gradle = await readFile(join(root, "android-host", "app", "build.gradle"), "utf8");
 const server = await readFile(join(root, "android-host", "app", "src", "main", "java", "com", "househelper", "familydashboard", "HouseholdServer.java"), "utf8");
 const manifest = await readFile(join(root, "android-host", "app", "src", "main", "AndroidManifest.xml"), "utf8");
+const filePaths = await readFile(join(root, "android-host", "app", "src", "main", "res", "xml", "file_paths.xml"), "utf8");
 const mainActivity = await readFile(join(root, "android-host", "app", "src", "main", "java", "com", "househelper", "familydashboard", "MainActivity.java"), "utf8");
 
 assert.match(html, /id="passcodeForm" novalidate/);
@@ -65,11 +66,13 @@ assert.match(html, /id="evidenceViewerDialog"/);
 assert.match(html, /id="listIdentityDialog"/);
 assert.match(html, /id="weatherDialog"/);
 assert.match(html, /id="pairingQrCode"/);
+assert.match(html, /id="chorePhoto"[^>]*multiple/);
+assert.doesNotMatch(html, /id="chorePhoto"[^>]*capture=/, "chore photos must offer both the camera and the file picker");
 assert.doesNotMatch(html + app + readme, new RegExp("[\\u2014\\u2013\\u2011]"), "user-facing copy must not contain long dash characters");
 assert.doesNotMatch(html, /\bAI\b/, "the interface must use direct product language");
 for (const asset of ["qr", "languages", "language-german-b1", "language-korean-b1", "language-world", "language-more", "app", "sync"]) {
-  assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be loaded by the dashboard");
-  assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.6\\.0"), asset + " must be available offline");
+  assert.match(html, new RegExp(asset + "\\.js\\?v=0\\.6\\.1"), asset + " must be loaded by the dashboard");
+  assert.match(worker, new RegExp(asset + "\\.js\\?v=0\\.6\\.1"), asset + " must be available offline");
 }
 assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/, "service worker must never cache household API responses");
 assert.match(app, /updateViaCache:\s*"none"/, "service worker updates must bypass stale HTTP caches");
@@ -85,16 +88,25 @@ assert.match(app, /existingLanguageCardProgress/, "viewing the expanded catalog 
 assert.match(app, /retained >= 1 \|\| introduced >= Math\.min\(3/, "a learner must unlock the next module after trying three cards in the previous one");
 assert.match(app, /reviewReason/);
 assert.match(app, /chore\.id \+ ":feedback"/);
+assert.match(app, /const MAX_CHORE_PHOTOS = 6/);
+assert.match(app, /record\[phase \+ "Photos"\]/, "multi-photo metadata must be stored with each chore phase");
+assert.match(app, /jpegTakenAt/, "JPEG camera timestamps must be read when available");
 assert.match(app, /data-list-identity/);
 assert.match(app, /api\.open-meteo\.com\/v1\/forecast/);
 assert.match(app, /geocoding-api\.open-meteo\.com\/v1\/search/);
 assert.match(app, /beginWidgetHold/);
 assert.match(app, /HouseHelperQR\.toCanvas/);
-assert.match(gradle, /versionName = "0\.6\.0"/);
-assert.match(server, /APP_VERSION = "0\.6\.0"/);
+assert.match(gradle, /versionName = "0\.6\.1"/);
+assert.match(gradle, /androidx\.core:core/, "Android FileProvider support must be packaged");
+assert.match(server, /APP_VERSION = "0\.6\.1"/);
 assert.match(manifest, /android\.permission\.ACCESS_COARSE_LOCATION/);
+assert.match(manifest, /androidx\.core\.content\.FileProvider/);
+assert.match(filePaths, /cache-path name="camera" path="camera\/"/);
 assert.match(mainActivity, /onGeolocationPermissionsShowPrompt/);
 assert.match(mainActivity, /setGeolocationEnabled\(true\)/);
+assert.match(mainActivity, /MODE_OPEN_MULTIPLE/);
+assert.match(mainActivity, /getClipData\(\)/, "Android multi-file results must retain every selected URI");
+assert.match(mainActivity, /pendingCameraFile\.length\(\) > 0/, "empty camera results must never be returned to the WebView");
 assert.match(app, /const DEFAULT_CHORES = \[\];/);
 assert.match(app, /const DEFAULT_ARTWORKS = \[\];/);
 assert.match(app, /const DEFAULT_EVENTS = \[\];/);
@@ -147,7 +159,7 @@ const context = {
     const payload = options.method === "POST"
       ? { revision: 1, clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" }
       : { revision: 1, entries: [], clients: [], inviteUrl: "http://192.168.1.2:4173/?pair=test-token&role=secondary#home" };
-    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.6.0" : null }, json: async () => payload };
+    return { ok: true, status: 200, headers: { get: (name) => name === "X-HouseHelper-Version" ? "0.6.1" : null }, json: async () => payload };
   },
   localStorage: storage,
   location: { hostname: "192.168.1.2", origin: "http://192.168.1.2:4173", pathname: "/", search: "?pair=test-token", reload() {}, assign() {} },

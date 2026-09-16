@@ -44,7 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class HouseholdServer {
-    public static final String APP_VERSION = "0.6.0";
+    public static final String APP_VERSION = "0.6.1";
     private static final int MAX_SYNC_BYTES = 12 * 1024 * 1024;
     private static final int MAX_MEDIA_BYTES = 30 * 1024 * 1024;
     private static final long ACTIVE_CLIENT_MS = 30_000L;
